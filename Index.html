@@ -480,7 +480,11 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
     <div class="app-header-btns">
       <button class="hbtn active-user" id="activeUserBtn" onclick="doLogout()">👤 —</button>
       <button class="hbtn" onclick="openAbout()">ℹ️ عن الأداة</button>
-      <button class="hbtn ver-btn" onclick="openChangelog()">v3.1.1 📋</button>
+      <button class="hbtn ver-btn" onclick="openChangelog()" id="verBtn">v3.2.0 📋</button>
+      <!-- v3.2.0 — بيظهر بس لو نسخة الـ Worker مختلفة عن نسخة الواجهة
+           (بيكشف "الـ deploy نجح والأداة زي ما هي" / نسخة مستنية Promote) -->
+      <button class="hbtn" id="verMismatchBtn" style="display:none;border-color:var(--amber);color:var(--amber);background:var(--amber-bg);"
+              onclick="showVersionMismatch()">⚠️ نسخة الـ Worker مختلفة</button>
       <button class="hbtn" id="settingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
     </div>
   </div>
@@ -537,6 +541,10 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
         <div id="resultsSummaryPills" class="summary-pills"></div>
       </div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+
+        <!-- v3.2.0 — بانر أخطاء بوسطة/شوبيفاي. قبل كده أي فشل في نداء بوسطة كان
+             بيتحول لـ "غير موجود ببوسطة" على كل الأرقام من غير أي إشارة للسبب. -->
+        <div id="lookupAlert" style="display:none;"></div>
 
         <div class="action-bar">
           <label class="select-all-label">
@@ -607,11 +615,12 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
                 <th>الأوردر</th>
                 <th>الماكينة</th>
                 <th>التحديث</th>
+                <th>النتيجة</th>
                 <th>التتبع</th>
               </tr>
             </thead>
             <tbody id="logBody">
-              <tr><td colspan="6"><div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل</div></div></td></tr>
+              <tr><td colspan="7"><div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل</div></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -645,6 +654,16 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
       <div class="settings-field">
         <label class="settings-label">ADMIN WORKER URL</label>
         <input class="settings-input" id="cfgAdminUrl" type="text" />
+      </div>
+
+      <!-- ══ v3.2.0 — فحص النظام ══════════════════════════════════════════
+           بينادي ?action=diag: متغيرات الـ Worker، صلاحيات تطبيق شوبيفاي،
+           الـ LOCATION_ID، بوسطة، D1، والـ CORS. صفر كتابة، صفر أثر جانبي.
+           الفحص ده كان هيكشف عطل 19→23-08 (صلاحية write_returns) في ثواني. -->
+      <div class="settings-field" style="border-top:1.5px solid var(--border-light);padding-top:12px;margin-top:4px;">
+        <label class="settings-label">فحص النظام</label>
+        <button class="btn btn-outline btn-sm" id="diagBtn" onclick="runDiag()">🩺 افحص الأداة والاتصالات</button>
+        <div id="diagResult" style="margin-top:10px;font-size:12px;line-height:1.7;"></div>
       </div>
     </div>
     <div class="settings-modal-ftr">
@@ -687,8 +706,16 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
           <ul>
             <li><code>orderType = Send</code> → رفض فوري (النوع ده شحن أصلي، مش من اختصاص أداة المرتجعات)</li>
             <li>مسار <b>RTO</b>: S1 ∈ {Shipped, In-Return} + S2 فاضي + returnStatus = NO_RETURN → يلغي الأوردر على شوبيفاي (<code>orderCancel</code>، استرجاع للمخزون) ثم يكتب <code>custom.manual_status = Returned</code></li>
-            <li>مسار <b>مرتجع بعد التسليم</b>: S1 = Delivered + S2 ∈ {Shipped, In-Return} + returnStatus ∈ {IN_PROGRESS, RETURN_REQUESTED} → يكتب <code>custom.status_2_r_e = Returned</code> ثم يسترجع كل قطعة راجعة فعليًا للمخزون (<code>reverseFulfillmentOrderDispose</code>)</li>
+            <li>مسار <b>مرتجع بعد التسليم</b>: S1 = Delivered + S2 ∈ {Shipped, In-Return} + returnStatus = <code>IN_PROGRESS</code> → يكتب <code>custom.status_2_r_e = Returned</code> ثم يسترجع كل قطعة راجعة فعليًا للمخزون (<code>reverseFulfillmentOrderDispose</code>) — بالكمية <b>المتبقية</b> فقط</li>
+            <li><code>returnStatus = RETURN_REQUESTED</code> → <b>مرفوض</b> (من v3.2.0): المرتجع لسه محتاج approve من CS، وقبله شوبيفاي ما بتنشئش أي <code>reverseFulfillmentOrder</code> — يعني الحالة كانت هتتكتب والمخزون ما يرجعش</li>
             <li>غير كده → رفض هذا الأوردر فقط مع سبب مفصّل، وباقي الأوردرات المحددة تتحدث عادي</li>
+          </ul>
+
+          <h4>التحقق بعد التنفيذ (v3.2.0)</h4>
+          <ul>
+            <li><b>الاسترجاع:</b> العدّ بيتم من رد شوبيفاي نفسه، وبعدها قراءة تحقق بتأكد إن الـ <code>dispositions</code> اتسجّلت على اللوكيشن الصح</li>
+            <li><b>الإلغاء:</b> <code>orderCancel</code> بيرجّع <code>job</code> (غير متزامن) — الأداة بتتأكد بعد الدفعة إن <code>cancelledAt</code> اتسجّل فعلاً وإن فيه دليل استرجاع مخزون</li>
+            <li>أي عملية ما اتأكدتش بتظهر <b>صفراء (تم جزئيًا)</b> مع سبب واضح — مش خضراء</li>
           </ul>
           <p>مفيش أي تاج بيتكتب على شوبيفاي — التحديث بيروح مباشرة على الميتافيلد،
           بالإضافة لأكشن شوبيفاي واحد إضافي حسب المسار (إلغاء الأوردر لمسار RTO، أو
@@ -700,6 +727,8 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
             <tr><th>action</th><th>الوصف</th></tr>
             <tr><td><code>lookup</code></td><td>بوسطة + شوبيفاي (S1/S2/returnStatus) + التحقق من الانتقال</td></tr>
             <tr><td><code>update</code></td><td>إعادة تحقق دفاعي، ثم لكل أوردر لوحده: (RTO) <code>orderCancel</code> → <code>metafieldsSet</code> | (مرتجع بعد التسليم) <code>metafieldsSet</code> → <code>reverseFulfillmentOrderDispose</code> + D1 log (نجاح أو فشل)</td></tr>
+            <tr><td><code>diag</code></td><td><b>جديد v3.2.0</b> — فحص ذاتي بدون أي كتابة: متغيرات الـ Worker وأسماؤها، صلاحيات تطبيق شوبيفاي (<code>write_returns</code>…)، الـ LOCATION_ID، بوسطة، D1، والـ Origin</td></tr>
+            <tr><td><code>get_config</code></td><td><b>جديد v3.2.0</b> — نسخة الـ Worker؛ الواجهة بتقارنها بنسختها وبتحذّر لو مختلفين</td></tr>
             <tr><td><code>get_logs</code> / <code>_count</code> / <code>_export</code></td><td>سجل هذه الأداة فقط (جديد + قديم)</td></tr>
           </table>
         </div>
@@ -727,6 +756,10 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
           <ul>
             <li>D1 logging: العمليات الجديدة تحت <code>tool = metafields_change</code>. أحداث الدخول/الخروج تفضل تحت <code>tool = bosta_return</code> بدون تغيير.</li>
             <li>أي أوردر توصّل لمرحلة التنفيذ الفعلي (نجح أو فشل) بيتسجل في D1 دايمًا — عشان الإلغاء (<code>orderCancel</code>) إجراء لا رجعة فيه، والفشل الجزئي لازم يبان في السجل.</li>
+            <li><b>v3.2.0 — قاعدة "مفيش نجاح من غير دليل":</b> <code>shopifyGQL()</code> في الـ Worker بترمي خطأ على كل أنواع الفشل (HTTP status، رد مش JSON، أخطاء GraphQL عليا بـ <code>data:null</code>). قبل كده أخطاء الصلاحيات كانت بتعدّي كنجاح لأن <code>userErrors</code> بتبقى فاضية لما <code>data</code> ترجع <code>null</code>.</li>
+            <li>الاسترجاع بيتم بالكمية <b>المتبقية</b> (<code>totalQuantity − Σ dispositions</code>) — الـ <code>reverseFulfillmentOrder</code> بيفضل <code>OPEN</code> حتى بعد الاسترجاع الكامل، فشرط <code>OPEN</code> لوحده مش بيمنع الاسترجاع المزدوج.</li>
+            <li>الصلاحيات المطلوبة على تطبيق شوبيفاي: <code>read_orders</code> · <code>write_orders</code> · <code>read_returns</code> · <code>write_returns</code>. شغّل <code>diag</code> من الإعدادات بعد أي تغيير في التطبيق.</li>
+            <li>فشل الكتابة في D1 بيرجع في الرد كـ <code>logged:false</code> وبيظهر تنبيه — مش بيتبلع.</li>
           </ul>
         </div>
       </details>
@@ -743,6 +776,30 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
       <button class="modal-close-x" onclick="closeChangelog()">✕</button>
     </div>
     <div class="eco-modal-body">
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge">v3.2.0</span>
+          <span class="cl-ver-date">23-08-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>الاسترجاع للمخزون ماكانش بيحصل أصلاً في مسار [S-2]</b> — التطبيق ماكانش واخد صلاحية <code>write_returns</code>، وشوبيفاي كانت بترجّع الخطأ كـ GraphQL error علوي (<code>data:null</code>) والكود كان بيقرا <code>userErrors</code> بس (فاضية في الحالة دي) ويسجّل <code>reverseDispose×N</code> كأنه نجح. الاسترجاع الحقيقي كان بيعمله الـ Flow — واللي خفى العطل تمامًا</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <code>shopifyGQL()</code> بقت ترمي خطأ على كل أنواع الفشل: HTTP status، رد مش JSON، أخطاء GraphQL عليا، و<code>data</code> فاضية — مفيش نداء شوبيفاي واحد ممكن يعدّي وهو فاشل. + إعادة محاولة تلقائية على <code>THROTTLED</code></li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> الاسترجاع بقى بالكمية <b>المتبقية</b> (<code>totalQuantity − Σ dispositions</code>) مش <code>totalQuantity</code> الأعمى — الـ <code>reverseFulfillmentOrder</code> بيفضل <code>OPEN</code> حتى بعد الاسترجاع الكامل، فالشرط القديم ماكانش بيمنع الاسترجاع المزدوج ولا بيفرّق بين "مسترجَع قبل كده" و"فشل"</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> العدّاد بقى بيعدّ اللي شوبيفاي <b>أكدته</b> مش اللي إحنا طلبناه — وبعده قراءة تحقق بتأكد الـ <code>dispositions</code> على اللوكيشن الصح</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> تحقق من الإلغاء بعد الدفعة — <code>orderCancel</code> بيرجّع <code>job</code> غير متزامن، فالأداة بتتأكد إن <code>cancelledAt</code> اتسجّل فعلاً وإن فيه دليل استرجاع مخزون قبل ما تقول "تم"</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> حالة ثالثة <b>⚠ تم جزئيًا</b> (صفراء) — الميتافيلد اتكتب بس فيه حاجة محتاجة عينك (ما اترجعش مخزون / ما اتأكدناش من الإلغاء / القطع كانت مسترجَعة قبل كده). قبل كده الحالات دي كانت بتبان خضراء</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> <code>?action=diag</code> + زرار <b>🩺 فحص النظام</b> في الإعدادات — بيفحص المتغيرات وأسماءها، <b>صلاحيات تطبيق شوبيفاي</b>، الـ LOCATION_ID، بوسطة، D1، والـ Origin. بدون أي كتابة. الفحص ده كان هيكشف العطل ده في ثواني</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> مقارنة نسخة الواجهة بنسخة الـ Worker (<code>get_config</code>) — تحذير فوري لو النسخة المنشورة مش المتوقعة (Promote ناقص / Worker شبح)</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> أخطاء بوسطة بقت تظهر — أي فشل في نداء البحث كان بيتبلع في <code>catch</code> فاضي وبيتحول لـ"غير موجود ببوسطة" على كل الأرقام. دلوقتي بانر أحمر + وسم "تعذّر الاستعلام" على الأرقام المتأثرة</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> التحقق من اسم الأوردر الراجع من بحث شوبيفاي — أي اسم غير مطابق بيترفض بدل ما تتكتب الحالة على أوردر تاني</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> فشل الكتابة في D1 بقى بيبان (<code>logged:false</code> + تنبيه) بدل ما يتبلع</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> متغير ناقص (زي <code>LOCATION_ID</code>) بيوقف العملية برسالة باسمه — قبل كده كان بيتحوّل لـ <code>Location/undefined</code> ويفشل بصمت</li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span> <code>returnStatus = RETURN_REQUESTED</code> بقى <b>مرفوض</b> — المرتجع لسه محتاج approve من CS، وقبله مفيش <code>reverseFulfillmentOrder</code> يترجع منه مخزون</li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span> CORS اتحوّل لقائمة نطاقات مسموحة (Option B) — الأداة بقت بتلغي أوردرات وبتحرّك مخزون، يعني أداة كتابة</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> عمود <b>النتيجة</b> في تاب السجل + أعمدة جديدة في تصدير XLSX (النتيجة · قطع للمخزن · التحذيرات)</li>
+        </ul>
+      </div>
 
       <div class="cl-version-block">
         <div class="cl-version-row">
@@ -811,6 +868,13 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 <script>
 'use strict';
 
+// ══ Version ═══════════════════════════════════════════════════════════════════
+// v3.2.0 — مصدر واحد لرقم نسخة الواجهة. الأداة بتقارنه بنسخة الـ Worker
+// (?action=get_config) وبتحذّر لو مختلفين — ده بيكشف حالتين صامتتين معروفتين:
+// نسخة اتعملها Save من غير Promote، أو Worker شبح اتنشر باسم تاني.
+const UI_VERSION = '3.2.0';
+let   workerVersion = null;
+
 // ══ Config & LS Keys ══════════════════════════════════════════════════════════
 const LS_URL       = 'bosta_returned_scanner_worker_url';
 const LS_SECRET    = 'bosta_returned_scanner_worker_secret';
@@ -872,29 +936,135 @@ function formatDateTime(iso) {
 }
 
 // ══ API Helpers ═══════════════════════════════════════════════════════════════
+// v3.2.0 — رسائل الفشل بقت تفرّق بين "الـ Worker رد بخطأ" و"مقدرناش نوصله أصلاً"
+// (CORS / URL غلط / الـ Worker واقع). الحالتين كانوا بيديّوا "Failed to fetch" غامضة.
+async function apiRequest(url, opts) {
+  let resp;
+  try {
+    resp = await fetch(url, opts);
+  } catch (e) {
+    throw new Error(`تعذّر الوصول للـ Worker — راجع الـ URL في الإعدادات أو نطاق الصفحة (CORS): ${e.message}`);
+  }
+  const text = await resp.text();
+  let data;
+  try { data = JSON.parse(text); }
+  catch { throw new Error(`رد غير متوقع من الـ Worker (HTTP ${resp.status}): ${text.slice(0, 160)}`); }
+  if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+  return data;
+}
+
 async function apiPost(action, body = {}) {
   const cfg = getConfig();
   if (!cfg.url || !cfg.secret) throw new Error('يرجى ضبط إعدادات الـ Worker أولاً');
-  const resp = await fetch(`${cfg.url}?action=${action}`, {
+  return apiRequest(`${cfg.url}?action=${action}`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.secret}` },
     body:    JSON.stringify(body),
   });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-  return data;
 }
 
 async function apiGet(action, params = {}) {
   const cfg = getConfig();
   if (!cfg.url || !cfg.secret) throw new Error('يرجى ضبط إعدادات الـ Worker أولاً');
   const qs = new URLSearchParams({ action, ...params }).toString();
-  const resp = await fetch(`${cfg.url}?${qs}`, {
+  return apiRequest(`${cfg.url}?${qs}`, {
     headers: { 'Authorization': `Bearer ${cfg.secret}` },
   });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
-  return data;
+}
+
+// ══ §DIAG-JS — فحص النظام (v3.2.0) ════════════════════════════════════════════
+// بينادي ?action=diag ويعرض النتيجة كقائمة فحوصات. الهدف: أي مشكلة إعداد
+// (صلاحية ناقصة، متغير ناقص، مفتاح بوسطة غلط، Origin مرفوض) تبقى ظاهرة بالاسم
+// بدل ما تتحول لسلوك غلط صامت.
+const DIAG_LABELS = {
+  env:         'متغيرات وأسرار الـ Worker',
+  cors:        'الـ CORS (نطاق الصفحة)',
+  d1:          'قاعدة البيانات D1',
+  shopifyAuth: 'الاتصال بشوبيفاي (OAuth)',
+  shop:        'المتجر',
+  scopes:      'صلاحيات تطبيق شوبيفاي',
+  location:    'الـ LOCATION_ID (موقع المخزن)',
+  bosta:       'مفتاح بوسطة',
+};
+
+function diagLine(icon, color, title, detail) {
+  return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border-light);">
+    <span style="flex:0 0 auto;">${icon}</span>
+    <div style="flex:1;">
+      <div style="font-weight:600;color:${color};">${title}</div>
+      ${detail ? `<div style="color:var(--text-sub);font-size:11px;">${detail}</div>` : ''}
+    </div></div>`;
+}
+
+async function runDiag() {
+  const box = document.getElementById('diagResult');
+  const btn = document.getElementById('diagBtn');
+  btn.disabled = true;
+  box.innerHTML = `<div style="color:var(--text-sub);">جاري الفحص...</div>`;
+
+  try {
+    const d = await apiGet('diag');
+    const c = d.checks || {};
+    let html = '';
+
+    html += diagLine(
+      d.allOk ? '✅' : '⚠️',
+      d.allOk ? 'var(--green)' : 'var(--amber)',
+      d.allOk ? 'كل الفحوصات سليمة' : 'فيه فحص أو أكتر محتاج مراجعة',
+      `نسخة الـ Worker: ${d.version} · نسخة الواجهة: ${UI_VERSION}${d.version !== UI_VERSION ? ' ← مختلفين!' : ''}`
+    );
+
+    for (const [key, label] of Object.entries(DIAG_LABELS)) {
+      const chk = c[key];
+      if (!chk) continue;
+      const ok = chk.ok !== false;
+      let detail = chk.error || '';
+
+      if (key === 'env' && chk.missing?.length) detail = `ناقص: ${chk.missing.join('، ')}`;
+      if (key === 'scopes') {
+        detail = chk.missing?.length
+          ? `صلاحيات ناقصة: ${chk.missing.join('، ')}${chk.hint ? `<br>${chk.hint}` : ''}`
+          : `كل الصلاحيات المطلوبة موجودة (${(chk.required || []).join('، ')})`;
+      }
+      if (key === 'location' && ok) detail = `${chk.name || ''} — ${chk.id || ''}`;
+      if (key === 'cors')  detail = `${chk.origin}${ok ? '' : ' ← غير مسموح في الـ Worker'}`;
+      if (key === 'd1' && ok) detail = `${chk.activeEmployees} موظف نشط`;
+      if (key === 'shop' && ok) detail = `${chk.name || ''} (${chk.domain || ''})`;
+      if (key === 'bosta' && ok) detail = chk.detail || '';
+
+      html += diagLine(ok ? '✅' : '❌', ok ? 'var(--green)' : 'var(--red)', label, detail);
+    }
+
+    // أسماء المتغيرات — بتكشف المسافة المخفية في الاسم (سبب صامت معروف)
+    if (c.env?.keys?.length) {
+      html += `<details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--text-sub);">أسماء المتغيرات وأطوال القيم (بدون أي قيمة)</summary>
+        <div style="font-family:var(--mono);font-size:11px;direction:ltr;text-align:left;padding:6px 0;">
+        ${c.env.keys.map(k => `${k.name} · len=${k.nameLen} · val=${k.valLen ?? '—'}`).join('<br>')}
+        </div></details>`;
+    }
+
+    box.innerHTML = html;
+    showToast(d.allOk ? 'الفحص تمام ✓' : 'فيه ملاحظات في الفحص', d.allOk ? 'success' : 'error');
+  } catch (err) {
+    box.innerHTML = diagLine('❌', 'var(--red)', 'تعذّر تشغيل الفحص', err.message);
+    showToast(`فشل الفحص: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// مقارنة نسخة الواجهة بنسخة الـ Worker عند التشغيل
+async function checkWorkerVersion() {
+  try {
+    const d = await apiGet('get_config');
+    workerVersion = d.version || null;
+    const btn = document.getElementById('verMismatchBtn');
+    if (btn) btn.style.display = (workerVersion && workerVersion !== UI_VERSION) ? '' : 'none';
+  } catch { /* الإعدادات ممكن تكون لسه مش مضبوطة — مش وقت إزعاج المستخدم */ }
+}
+
+function showVersionMismatch() {
+  showToast(`الواجهة v${UI_VERSION} والـ Worker v${workerVersion} — ارفع نسخة الـ Worker الصح أو اعمل Promote`, 'error');
 }
 
 // ══ Modal Helpers ══════════════════════════════════════════════════════════════
@@ -1388,9 +1558,12 @@ async function startLookup() {
   try {
     const data = await apiPost('lookup', { trackingNumbers: scannedNums });
 
+    // v3.2.0 — أخطاء بوسطة/شوبيفاي بقت تظهر صراحةً بدل ما تتحول لـ"غير موجود"
+    renderLookupAlert(data.bostaErrors || [], data.shopifyError || null);
+
     const existingTNs = new Set(resultsData.map(r => r.trackingNumber));
     // selected: تحديد تلقائي بس للأوردرات المتوافقة (found && valid) — مش كل الموجود
-    const newEntries  = data.results.map(r => ({ ...r, shopifyStatus: null, failReason: null, selected: r.found && r.valid }));
+    const newEntries  = data.results.map(r => ({ ...r, shopifyStatus: null, failReason: null, updateDetail: null, selected: r.found && r.valid }));
     const merged = [...resultsData];
     for (const r of newEntries) {
       if (!existingTNs.has(r.trackingNumber)) merged.push(r);
@@ -1404,9 +1577,10 @@ async function startLookup() {
     document.getElementById('toggleStep1Btn').textContent = '+ إضافة المزيد';
 
     const rejected = newEntries.filter(r => r.found && !r.valid).length;
+    const failedTN = newEntries.filter(r => r.bostaFailed).length;
     showToast(
-      `استُعلم عن ${data.results.length} رقم${rejected ? ' — مرفوض: ' + rejected : ''}`,
-      rejected ? 'error' : 'success'
+      `استُعلم عن ${data.results.length} رقم${rejected ? ' — مرفوض: ' + rejected : ''}${failedTN ? ` — تعذّر الاستعلام عن ${failedTN}` : ''}`,
+      (rejected || failedTN) ? 'error' : 'success'
     );
   } catch (err) {
     showToast(`خطأ: ${err.message}`, 'error');
@@ -1422,27 +1596,47 @@ const STATE_MAP_COLORS = {
   47: 'badge-danger', 48: 'badge-danger', 49: 'badge-danger',
 };
 
+// v3.2.0 — بانر يوضّح أي فشل في نداءات بوسطة/شوبيفاي بدل ما يتخفى في النتائج
+function renderLookupAlert(bostaErrors, shopifyError) {
+  const el = document.getElementById('lookupAlert');
+  if (!el) return;
+  const msgs = [];
+  if (bostaErrors.length) msgs.push(`<b>تعذّر الاستعلام من بوسطة:</b> ${[...new Set(bostaErrors)].join(' · ')}`);
+  if (shopifyError)       msgs.push(`<b>تعذّر الاتصال بشوبيفاي:</b> ${shopifyError}`);
+  if (!msgs.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = `<div style="background:var(--red-bg);border:1.5px solid var(--red-b);color:var(--red);
+    border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;line-height:1.7;">
+    ⚠️ ${msgs.join('<br>')}<br>
+    <span style="color:var(--text-sub);">الأرقام المتأثرة اتعلّمت بـ"تعذّر الاستعلام" — دي <u>مش</u> معناها إن الشحنة مش موجودة.</span>
+    </div>`;
+}
+
 function renderResults() {
   const tbody = document.getElementById('resultsBody');
-  const found    = resultsData.filter(r => r.found).length;
-  const notFound = resultsData.filter(r => !r.found).length;
+  const notFound = resultsData.filter(r => !r.found && !r.bostaFailed).length;
   const valid    = resultsData.filter(r => r.found && r.valid).length;
   const rejected = resultsData.filter(r => r.found && !r.valid).length;
+  const failed   = resultsData.filter(r => r.bostaFailed).length;
 
   document.getElementById('resultsSummaryPills').innerHTML = `
     <div class="pill"><span class="pill-val">${resultsData.length}</span><span class="pill-lbl">إجمالي</span></div>
     <div class="pill success"><span class="pill-val">${valid}</span><span class="pill-lbl">متوافق</span></div>
     ${rejected > 0  ? `<div class="pill" style="border-color:var(--amber-b);"><span class="pill-val" style="color:var(--amber);">${rejected}</span><span class="pill-lbl">مرفوض</span></div>` : ''}
+    ${failed > 0    ? `<div class="pill danger"><span class="pill-val">${failed}</span><span class="pill-lbl">تعذّر الاستعلام</span></div>` : ''}
     ${notFound > 0 ? `<div class="pill danger"><span class="pill-val">${notFound}</span><span class="pill-lbl">غير موجود ببوسطة</span></div>` : ''}
   `;
 
   tbody.innerHTML = resultsData.map((r, i) => {
     const stateCls   = STATE_MAP_COLORS[r.stateCode] || 'badge-blue';
     const stateLabel = r.state || '—'; // معلومة بس من بوسطة — لا تؤثر على قرار التحديث
-    const shopifyCell  = getShopifyCell(r.shopifyStatus, r.failReason);
+    const shopifyCell  = getShopifyCell(r.shopifyStatus, r.failReason, r.updateDetail);
     const orderDisplay = r.found
       ? orderLink(r.businessRef, r.orderId)
-      : `<span class="badge badge-danger">غير موجود</span>`;
+      // ⚠️ v3.2.0 — التفرقة بين "بوسطة قالت مش موجود" و"إحنا ما قدرناش نسأل"
+      : (r.bostaFailed
+          ? `<span class="badge badge-warn" title="${(r.bostaError || '').replace(/"/g, '')}">تعذّر الاستعلام</span>`
+          : `<span class="badge badge-danger">غير موجود</span>`);
     const typeDisplay  = r.orderType ? `<span class="badge badge-neutral">${r.orderType}</span>` : `<span class="badge badge-neutral">—</span>`;
     const currentStateCell = getCurrentStateCell(r);
     const targetCell       = getTargetCell(r);
@@ -1495,15 +1689,41 @@ function getTargetCell(r) {
   return `<span class="badge badge-danger">مرفوض</span><br><span class="reject-reason">${r.rejectReason || ''}</span>`;
 }
 
-function getShopifyCell(status, failReason) {
+// v3.2.0 — ٣ حالات مش اتنين. الأصفر (warning) معناه: الميتافيلد اتكتب بس فيه
+// حاجة محتاجة عينك — أشهرها: ما اترجعش مخزون، أو ما اتأكدناش من الإلغاء.
+// قبل كده الحالتين دول كانوا بيبانوا "✓ تم" — وده بالظبط اللي خفى عطل الاسترجاع.
+function getShopifyCell(status, failReason, detail) {
   if (!status) return `<span class="badge badge-neutral">—</span>`;
-  if (status === 'success') return `<span class="badge badge-success">✓ تم</span>`;
+
+  const detailLine = detail
+    ? `<br><span class="reject-reason" style="color:var(--text-sub);">${detail}</span>`
+    : '';
+
+  if (status === 'success') return `<span class="badge badge-success">✓ تم</span>${detailLine}`;
+
+  if (status === 'warning') {
+    return `<span class="badge badge-warn">⚠ تم جزئيًا</span>${detailLine}`
+      + (failReason ? `<br><span class="reject-reason" style="color:var(--amber);">${failReason}</span>` : '');
+  }
+
   if (status === 'error') {
     // ⚠️ سبب الفشل لازم يظهر هنا — من غيره الموظف مش هيعرف السبب الحقيقي
-    return `<span class="badge badge-danger">✗ فشل</span>`
+    return `<span class="badge badge-danger">✗ فشل</span>${detailLine}`
       + (failReason ? `<br><span class="reject-reason">${failReason}</span>` : '');
   }
   return `<span class="badge badge-neutral">—</span>`;
+}
+
+// وصف مختصر لِما حدث فعلاً على شوبيفاي (بيتبني من actions اللي رجّعها الـ Worker)
+function describeActions(res) {
+  if (!res) return '';
+  const parts = [];
+  if (res.actions?.includes('orderCancel')) parts.push('إلغاء الأوردر');
+  const restock = (res.actions || []).find(a => a.startsWith('restock×'));
+  if (restock) parts.push(`استرجاع ${restock.split('×')[1]} قطعة للمخزن`);
+  if (res.actions?.some(a => a.startsWith('metafields:'))) parts.push('كتابة الحالة');
+  if (res.logged === false) parts.push('⚠ ما اتسجلش في السجل');
+  return parts.join(' · ');
 }
 
 function onRowCheck(i, checked) { resultsData[i].selected = checked; syncSelectAll(); updateUpdateBtn(); }
@@ -1563,11 +1783,13 @@ async function startUpdate() {
       const key = String(r.businessRef || '').replace(/^#/, '');
       const res = resultMap[key];
       if (res) {
-        r.shopifyStatus = res.success ? 'success' : 'error';
-        // لو السيرفر رفض أوردر كان valid وقت الـ lookup (الحالة اتغيرت في الأثناء)
-        if (!res.success && res.error) r.failReason = res.error;
+        // v3.2.0 — الحالة جاية من السيرفر كـ success | warning | error
+        r.shopifyStatus = res.status || (res.success ? 'success' : 'error');
+        r.failReason    = res.error || (res.warnings?.length ? res.warnings.join(' · ') : null);
+        r.updateDetail  = describeActions(res);
+        r.updateResult  = res;
         const cell = document.getElementById(`shopify-cell-${i}`);
-        if (cell) cell.innerHTML = getShopifyCell(r.shopifyStatus, r.failReason);
+        if (cell) cell.innerHTML = getShopifyCell(r.shopifyStatus, r.failReason, r.updateDetail);
         done++;
         progressText.textContent = `${done} / ${toUpdate.length}`;
         progressBar.style.width  = `${Math.round(done / toUpdate.length * 100)}%`;
@@ -1575,10 +1797,20 @@ async function startUpdate() {
     }
 
     const s = data.summary?.succeeded || 0;
+    const w = data.summary?.warned    || 0;
     const f = data.summary?.failed    || 0;
-    showToast(`تم: ${s} ✓${f > 0 ? ` | فشل: ${f}` : ''}`, s > 0 ? 'success' : 'error');
+    showToast(
+      `تم: ${s} ✓${w > 0 ? ` | تحذير: ${w} ⚠` : ''}${f > 0 ? ` | فشل: ${f} ✗` : ''}`,
+      f > 0 ? 'error' : (w > 0 ? 'error' : 'success')
+    );
+    if (w > 0) playBeep('warn');
+    if (data.results?.some(x => x.logged === false)) {
+      showToast('⚠️ في عملية أو أكتر ما اتسجلتش في السجل — راجع D1', 'error');
+    }
   } catch (err) {
-    showToast(`خطأ: ${err.message}`, 'error');
+    // ⚠️ التنفيذ بيحصل كامل على السيرفر قبل ما يرد — لو الاتصال قطع في النص،
+    // ممكن يكون فيه أوردرات اتحدّثت فعلاً. تاب السجل هو المرجع.
+    showToast(`خطأ: ${err.message} — راجع تاب السجل قبل ما تعيد المحاولة`, 'error');
   } finally {
     btn.disabled = false;
     updateUpdateBtn();
@@ -1602,19 +1834,29 @@ async function exportResultsXLSX() {
     { header: 'التحديث المطلوب',  key: 'target', width: 20 },
     { header: 'سبب الرفض',        key: 'reject', width: 34 },
     { header: 'تحديث شوبيفاي',    key: 'shopify',width: 16 },
+    { header: 'ما تم فعليًا',      key: 'did',    width: 34 },
+    { header: 'قطع رجعت للمخزن',  key: 'units',  width: 16 },
   ];
   resultsData.forEach(r => {
+    const res = r.updateResult || null;
+    const units = res
+      ? (res.restock?.verifiedUnits ?? res.restock?.confirmed ?? res.cancel?.restockedUnits ?? '')
+      : '';
     ws.addRow({
       order:   r.found ? (r.businessRef.startsWith('#') ? r.businessRef : '#' + r.businessRef) : '—',
       tn:      r.trackingNumber,
       type:    r.orderType   || '—',
-      state:   r.state       || 'غير موجود',
+      state:   r.state       || (r.bostaFailed ? 'تعذّر الاستعلام' : 'غير موجود'),
       s1:      r.s1           || '—',
       s2:      r.s2           || '—',
       rs:      r.returnStatus || '—',
       target:  r.valid ? (r.machine === 'S1' ? 'S1 → Returned' : '[S-2] → Returned') : '—',
       reject:  r.rejectReason || r.failReason || '—',
-      shopify: r.shopifyStatus === 'success' ? 'تم التحديث' : r.shopifyStatus === 'error' ? 'فشل' : '—',
+      shopify: r.shopifyStatus === 'success' ? 'تم'
+             : r.shopifyStatus === 'warning' ? 'تم جزئيًا (راجع الملاحظة)'
+             : r.shopifyStatus === 'error'   ? 'فشل' : '—',
+      did:     r.updateDetail || '—',
+      units:   units === '' ? '—' : units,
     });
   });
   const buf  = await wb.xlsx.writeBuffer();
@@ -1648,7 +1890,7 @@ async function fetchLog() {
   if (search)   { params.search   = search;   countParams.search   = search;   }
 
   document.getElementById('logBody').innerHTML =
-    `<tr><td colspan="6"><div class="empty-state"><div class="spinner spinner-dark" style="margin:0 auto 8px"></div><div>جاري التحميل...</div></div></td></tr>`;
+    `<tr><td colspan="7"><div class="empty-state"><div class="spinner spinner-dark" style="margin:0 auto 8px"></div><div>جاري التحميل...</div></div></td></tr>`;
 
   try {
     const [pageData, countData] = await Promise.all([
@@ -1660,14 +1902,14 @@ async function fetchLog() {
     renderPagination();
   } catch (err) {
     document.getElementById('logBody').innerHTML =
-      `<tr><td colspan="6"><div class="empty-state"><div class="icon">❌</div><div>فشل التحميل: ${err.message}</div></div></td></tr>`;
+      `<tr><td colspan="7"><div class="empty-state"><div class="icon">❌</div><div>فشل التحميل: ${err.message}</div></div></td></tr>`;
   }
 }
 
 function renderLogTable(entries) {
   const tbody = document.getElementById('logBody');
   if (!entries.length) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل</div></div></td></tr>`;
     return;
   }
   tbody.innerHTML = entries.map(e => {
@@ -1690,6 +1932,25 @@ function renderLogTable(entries) {
       ? `<span class="tracking-num" style="font-size:12px;">${e.value_before || '—'} → ${e.value_after || '—'}</span>`
       : `<span class="tracking-num" style="font-size:12px;">${e.notes || '—'}</span>`;
 
+    // v3.2.0 — عمود النتيجة: نجاح / تحذير / فشل + اللي حصل فعليًا.
+    // السجلات الأقدم من v3.2.0 مالهاش extra.result — بتتعرض كـ"—" مش كنجاح،
+    // لأننا مش عارفين إن كان الاسترجاع حصل فعلاً وقتها.
+    const result   = extra.result || null;
+    const restockA = (extra.actions || []).find(a => String(a).startsWith('restock×') || String(a).startsWith('reverseDispose×'));
+    const units    = restockA ? String(restockA).split('×')[1] : null;
+    const warn     = (extra.warnings || []).join(' · ');
+
+    const resultBadge = isLegacy
+      ? `<span class="badge badge-neutral">—</span>`
+      : result === 'success' ? `<span class="badge badge-success">✓ تم</span>`
+      : result === 'warning' ? `<span class="badge badge-warn" title="${warn.replace(/"/g, '')}">⚠ جزئي</span>`
+      : result === 'error'   ? `<span class="badge badge-danger" title="${String(extra.error || '').replace(/"/g, '')}">✗ فشل</span>`
+      : `<span class="badge badge-neutral" title="سجل قبل v3.2.0 — النتيجة ماكانتش بتتسجل">—</span>`;
+
+    const resultCell = `${resultBadge}` +
+      (units ? `<br><span class="reject-reason" style="color:var(--text-sub);">${units} قطعة للمخزن</span>` : '') +
+      (warn  ? `<br><span class="reject-reason" style="color:var(--amber);">${warn}</span>` : '');
+
     return `
       <tr>
         <td class="log-ts">${formatDateTime(e.timestamp)}</td>
@@ -1697,6 +1958,7 @@ function renderLogTable(entries) {
         <td class="log-order">${e.order_name ? orderLink(e.order_name, e.order_id) : '—'}</td>
         <td>${machineBadge}</td>
         <td>${transition}</td>
+        <td>${resultCell}</td>
         <td class="log-ts">${tn}</td>
       </tr>`;
   }).join('');
@@ -1746,9 +2008,13 @@ async function exportLogXLSX() {
       { header: 'إلى',            key: 'after',     width: 18 },
       { header: 'رقم التتبع',     key: 'tn',        width: 18 },
       { header: 'نوع بوسطة',      key: 'orderType', width: 14 },
+      { header: 'النتيجة',        key: 'result',    width: 12 },
+      { header: 'قطع للمخزن',     key: 'units',     width: 12 },
+      { header: 'ملاحظات/تحذيرات', key: 'warn',     width: 44 },
     ];
     entries.forEach(e => {
       const extra = e.extra ? (typeof e.extra === 'string' ? JSON.parse(e.extra) : e.extra) : {};
+      const restockA = (extra.actions || []).find(a => String(a).startsWith('restock×') || String(a).startsWith('reverseDispose×'));
       ws.addRow({
         ts:        formatDateTime(e.timestamp),
         emp:       e.employee   || '—',
@@ -1758,6 +2024,11 @@ async function exportLogXLSX() {
         after:     e.value_after  || e.notes || '—',
         tn:        extra.trackingNumber || '—',
         orderType: extra.orderType      || '—',
+        result:    extra.result === 'success' ? 'تم'
+                 : extra.result === 'warning' ? 'جزئي'
+                 : extra.result === 'error'   ? 'فشل' : '—',
+        units:     restockA ? String(restockA).split('×')[1] : '—',
+        warn:      (extra.warnings || []).join(' · ') || extra.error || '—',
       });
     });
 
@@ -1792,6 +2063,7 @@ document.addEventListener('click', e => {
   const cfg = getConfig();
   if (cfg.url && cfg.secret) {
     loadEmployeesList();
+    checkWorkerVersion();   // v3.2.0 — تحذير فوري لو النسخة المنشورة مش المتوقعة
   }
 })();
 </script>
