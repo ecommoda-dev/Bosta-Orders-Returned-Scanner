@@ -1,62 +1,101 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<!-- skills: html-builder v1.0.0 · constants v1.2.0 — 26-08-2026 -->
+<!-- skills: html-builder v6.3.0 · constants v1.4.4 · order-lifecycle v1.2.0 — 05-09-2026 -->
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bosta Orders Returned Scanner</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <style>
 /* ══════════════════════════════════════════════════════════════
-   CSS VARIABLES — EcomModa Design System (Red Theme)
+   §STYLES — :root tokens + كل CSS الأداة
+   ══════════════════════════════════════════════════════════════
+   التوكنز نسخة حرفية من `ecommoda-html-builder` → references/design-system.md.
+   ⚠️ الأداة دي هي **الاستثناء الأحمر الوحيد المعتمد** في الستاك (قاعدة ٢٥):
+   عيلة الـ accent بس بتاخد قيم الأحمر عشان موظف المخزن يفرّق فورًا بين أداة
+   الاسترجاع وأداة التتبّع — الخلط بينهم بيسجّل شحنة راجعة غلط. **باقي
+   المتغيّرات قياسية زي أي أداة**، والاستثناء ده تجاري مش جمالي ومايتعممش.
+   ⚠️ صفر #hex حرفي خارج البلوك ده (Standards #35) — الاستثناء الوحيد rgba()
+   بتاعة الظلال وحلقات الـ focus.
    ══════════════════════════════════════════════════════════════ */
 :root {
-  --font:        'Noto Sans Arabic', sans-serif;
-  --mono:        'IBM Plex Mono', monospace;
+  /* Backgrounds */
+  --bg:             #f3f4f6;
+  --surface:        #ffffff;
+  --surface-2:      #f9fafb;
+  --surface-hover:  #f0f4f8;
 
-  --bg:          #fff5f5;
-  --bg2:         #fef2f2;
-  --surface:     #ffffff;
-  --border:      #fca5a5;
-  --border-light:#fee2e2;
-  --text:        #111827;
-  --text-sub:    #6b7280;
-  --text-muted:  #9ca3af;
+  /* Borders */
+  --border:         #e5e7eb;
+  --border-strong:  #d1d5db;
 
-  --accent:      #dc2626;
-  --accent-h:    #b91c1c;
-  --accent-bg:   #fef2f2;
-  --accent-b:    #fca5a5;
+  /* Text */
+  --text-primary:   #111827;
+  --text-secondary: #6b7280;
+  --text-muted:     #9ca3af;
+  --text-mid:       #374151;
 
-  --green:       #16a34a;
-  --green-bg:    #f0fdf4;
-  --green-b:     #bbf7d0;
-  --red:         #991b1b;
-  --red-bg:      #fef2f2;
-  --red-b:       #fca5a5;
-  --amber:       #d97706;
-  --amber-bg:    #fffbeb;
-  --amber-b:     #fde68a;
-  --blue:        #2563eb;
-  --blue-bg:     #eff6ff;
-  --blue-b:      #bfdbfe;
-  --neutral-bg:  #f3f4f6;
-  --neutral-b:   #e5e7eb;
+  /* Accent — أحمر (الاستثناء المعتمد لأداة المرتجعات) */
+  --accent:              #dc2626;
+  --accent-light:        #fef2f2;
+  --accent-dark:         #b91c1c;
+  --accent-border:       #fca5a5;
+  --accent-hover:        #fde8e8;
+  --accent-hover-border: #f87171;
 
-  --radius:      10px;
-  --radius-sm:   8px;                 /* v3.1.1 — canonical design-system token */
-  --container-max: 980px;             /* v3.1.1 — يطابق عرض .app-wrapper */
-  --shadow:      0 1px 3px rgba(220,38,38,.10), 0 1px 2px rgba(220,38,38,.06);
-  --shadow-md:   0 4px 12px rgba(220,38,38,.12), 0 2px 4px rgba(220,38,38,.06);
+  /* Green (success) */
+  --green:          #16a34a;
+  --green-light:    #f0fdf4;
+  --green-border:   #bbf7d0;
+  --green-dark:     #15803d;
+
+  /* Red (error / destructive) */
+  --red:            #dc2626;
+  --red-light:      #fef2f2;
+  --red-border:     #fca5a5;
+  --red-dark:       #b91c1c;
+
+  /* Amber (warning) */
+  --amber:          #d97706;
+  --amber-light:    #fffbeb;
+  --amber-border:   #fde68a;
+  --amber-dark:     #92400e;
+
+  /* Purple (count / badge) */
+  --purple:         #7c3aed;
+  --purple-light:   #f5f3ff;
+  --purple-border:  #c4b5fd;
+  --purple-dark:    #4c1d95;
+
+  /* Blue — بادج S1 وبادجات الحالة. توكن خاص بالأداة لأن الـ accent هنا أحمر */
+  --blue:           #2563eb;
+  --blue-light:     #eff6ff;
+  --blue-border:    #bfdbfe;
+
+  /* Extras */
+  --on-accent:      #ffffff;
+  --neutral-dark:   #1a1d27;
+
+  /* Shape */
+  --radius:         12px;
+  --radius-sm:      8px;
+  --shadow:         0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:      0 4px 12px rgba(0,0,0,.12), 0 2px 4px rgba(0,0,0,.06);
+
+  /* Layout — Tier M: الأداة فيها Log Tab بجدول حقيقي (design-system.md) */
+  --container-max:  1200px;
+
+  /* Typography — خط واحد فقط (الخط الأحادي القديم أُلغي 19-08-2026) */
+  --font-body:      'Noto Sans Arabic', -apple-system, sans-serif;
+  --font-mono:      'Noto Sans Arabic', -apple-system, sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: var(--font);
+  font-family: var(--font-body);
   background: var(--bg);
-  color: var(--text);
+  color: var(--text-primary);
   min-height: 100vh;
   padding: 0;
   font-size: 14px;
@@ -64,12 +103,12 @@ body {
 }
 
 /* ── App Shell ── */
-.app-wrapper { max-width: var(--container-max); margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+.container { max-width: var(--container-max); margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
 
 /* ── App Header (UI Standard v2 — white shell, red accent) ── */
 .app-header {
   background: var(--surface);
-  border: 1.5px solid var(--border-light);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius);
   padding: 12px 18px;
   box-shadow: var(--shadow);
@@ -78,50 +117,50 @@ body {
 }
 .app-title      { display: flex; align-items: center; gap: 12px; }
 .app-icon       { font-size: 24px; }
-.app-title-text h1   { font-size: 16px; font-weight: 700; line-height: 1.3; color: var(--text); }
-.app-title-text span { font-size: 12px; color: var(--text-sub); margin-top: 2px; display: block; }
+.app-title-text h1   { font-size: 16px; font-weight: 700; line-height: 1.3; color: var(--text-primary); }
+.app-title-text span { font-size: 12px; color: var(--text-secondary); margin-top: 2px; display: block; }
 .app-header-btns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* ── Header Buttons (hbtn) ── */
 .hbtn {
   display: flex; align-items: center; gap: 5px;
   padding: 6px 12px;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid var(--border-strong);
   background: var(--surface);
   border-radius: var(--radius-sm);
-  font-family: var(--font); font-size: 12px; font-weight: 600;
-  color: var(--text-sub);
+  font-family: var(--font-body); font-size: 12px; font-weight: 600;
+  color: var(--text-secondary);
   cursor: pointer; transition: all .15s; white-space: nowrap;
 }
-.hbtn:hover    { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+.hbtn:hover    { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 .hbtn:disabled { opacity: .5; cursor: not-allowed; }
-.hbtn.settings-configured { border-color: var(--green); color: var(--green); background: var(--green-bg); }
-.hbtn.ver-btn  { border-color: var(--accent-b); color: var(--accent-h); background: var(--accent-bg); font-family: var(--mono); font-weight: 700; }
-.hbtn.ver-btn:hover { background: #fde8e8; border-color: var(--accent); color: var(--accent-h); }
-.hbtn.active-user       { border-color: var(--green); color: var(--green); background: var(--green-bg); }
-.hbtn.active-user:hover { border-color: var(--red);   color: var(--red);  background: var(--red-bg); }
+.hbtn.settings-configured { border-color: var(--green); color: var(--green); background: var(--green-light); }
+.hbtn.ver-btn  { border-color: var(--accent-border); color: var(--accent-dark); background: var(--accent-light); font-family: var(--font-mono); font-weight: 700; }
+.hbtn.ver-btn:hover { background: var(--accent-hover); border-color: var(--accent); color: var(--accent-dark); }
+.hbtn.active-user       { border-color: var(--green); color: var(--green); background: var(--green-light); }
+.hbtn.active-user:hover { border-color: var(--red);   color: var(--red);  background: var(--red-light); }
 
 /* ── Buttons ── */
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
   border: none; cursor: pointer; transition: background .15s, opacity .15s;
-  white-space: nowrap; font-family: var(--font);
+  white-space: nowrap; font-family: var(--font-body);
 }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
-.btn-primary   { background: var(--accent); color: #fff; }
-.btn-primary:not(:disabled):hover { background: var(--accent-h); box-shadow: 0 2px 8px rgba(220,38,38,.35); }
-.btn-outline   { background: #fff; color: var(--accent); border: 1.5px solid var(--accent-b); }
-.btn-outline:not(:disabled):hover { background: var(--accent-bg); }
-.btn-danger    { background: #fff; color: var(--red); border: 1.5px solid var(--accent-b); }
-.btn-danger:not(:disabled):hover  { background: var(--red-bg); }
-.btn-success   { background: var(--green); color: #fff; }
-.btn-success:not(:disabled):hover { background: #15803d; }
+.btn-primary   { background: var(--accent); color: var(--on-accent); }
+.btn-primary:not(:disabled):hover { background: var(--accent-dark); box-shadow: 0 2px 8px rgba(220,38,38,.35); }
+.btn-outline   { background: var(--surface); color: var(--accent); border: 1.5px solid var(--accent-border); }
+.btn-outline:not(:disabled):hover { background: var(--accent-light); }
+.btn-danger    { background: var(--surface); color: var(--red); border: 1.5px solid var(--accent-border); }
+.btn-danger:not(:disabled):hover  { background: var(--red-light); }
+.btn-success   { background: var(--green); color: var(--on-accent); }
+.btn-success:not(:disabled):hover { background: var(--green-dark); }
 .btn-sm { padding: 6px 11px; font-size: 12px; }
 
 /* ── Card ── */
-.card { background: var(--surface); border: 1.5px solid var(--border-light); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-.card-header { padding: 12px 18px; border-bottom: 1.5px solid var(--border-light); background: var(--bg2); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.card-header { padding: 12px 18px; border-bottom: 1.5px solid var(--border); background: var(--surface-2); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .card-header h2 { font-size: 14px; font-weight: 700; color: var(--accent); }
 .card-body { padding: 18px; }
 
@@ -129,7 +168,7 @@ body {
 .main-tabs-bar {
   display: flex; gap: 4px;
   background: var(--surface);
-  border: 1.5px solid var(--border-light);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius);
   padding: 6px;
   box-shadow: var(--shadow);
@@ -140,131 +179,319 @@ body {
   border: 2px solid transparent;
   background: transparent;
   border-radius: var(--radius-sm);
-  font-family: var(--font); font-size: 13px; font-weight: 600;
-  color: var(--text-sub);
+  font-family: var(--font-body); font-size: 13px; font-weight: 600;
+  color: var(--text-secondary);
   cursor: pointer; transition: all .15s;
   display: flex; align-items: center; justify-content: center; gap: 6px;
   white-space: nowrap;
 }
-.main-tab-btn:hover  { background: var(--bg2); color: var(--text); }
+.main-tab-btn:hover  { background: var(--surface-2); color: var(--text-primary); }
 .main-tab-btn.active {
-  background: var(--accent); color: #fff;
+  background: var(--accent); color: var(--on-accent);
   border-color: var(--accent);
   box-shadow: 0 2px 8px rgba(220,38,38,.28);
 }
+/* ── Freeze on Scroll — الهيدر + شريط التابات (tabs-and-modals.md § 1b) ── */
+.sticky-header-wrap { position: sticky; top: 0; z-index: 300; background: var(--bg); padding-top: 2px; margin: 0 -2px; }
+.sticky-header-wrap.stuck { box-shadow: 0 6px 18px rgba(0,0,0,.10); }
+.sticky-header-wrap.stuck .app-header        { padding: 6px 14px; }
+.sticky-header-wrap.stuck .app-icon          { font-size: 16px; }
+.sticky-header-wrap.stuck .app-title-text h1 { font-size: 12.5px; }
+.sticky-header-wrap.stuck .app-title-text span { max-height: 0; opacity: 0; margin-top: 0; }
+.sticky-header-wrap.stuck .hbtn              { padding: 4px 9px; font-size: 11px; }
+
+.app-header        { transition: padding .18s ease; }
+.app-icon          { transition: font-size .18s ease; }
+.app-title-text h1 { transition: font-size .18s ease; }
+.app-title-text span {
+  display: block; overflow: hidden; max-height: 16px; margin-top: 2px;
+  transition: max-height .18s ease, opacity .18s ease, margin-top .18s ease;
+}
+
+/* شريط التابات بيتقفل بـ max-height — مش display:none المفاجئة */
+.main-tabs-bar { overflow: hidden; margin-top: 12px;
+  transition: max-height .22s ease, opacity .18s ease, padding .18s ease, margin .18s ease, border-width .18s ease; }
+.sticky-header-wrap.stuck .main-tabs-bar {
+  max-height: 0 !important; opacity: 0; padding: 0; margin-top: 0; border-width: 0;
+}
+
+/* Chip التاب الحالي — يظهر بس وقت الـ Sticky */
+.active-tab-chip {
+  display: none; align-items: center; gap: 6px; padding: 5px 10px;
+  border: 1.5px solid var(--border-strong); border-radius: 20px;
+  background: var(--surface-2); font-size: 11.5px; font-weight: 700; color: var(--text-primary);
+  cursor: pointer; position: relative; white-space: nowrap; transition: border-color .15s, color .15s;
+}
+.active-tab-chip:hover { border-color: var(--accent); color: var(--accent); }
+.active-tab-chip.open  { border-color: var(--accent); color: var(--accent-dark); background: var(--accent-light); }
+.sticky-header-wrap.stuck .active-tab-chip { display: flex; }
+.chip-arrow { font-size: 9px; color: var(--text-muted); transition: transform .2s; }
+.active-tab-chip.open .chip-arrow { transform: rotate(180deg); }
+.tab-chip-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 310; min-width: 180px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 28px rgba(0,0,0,.14); display: none; padding: 4px;
+}
+.tab-chip-menu.open { display: block; }
+.tab-chip-item {
+  display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: 12.5px; font-weight: 600;
+  border-radius: 6px; cursor: pointer; color: var(--text-secondary); white-space: nowrap;
+}
+.tab-chip-item:hover  { background: var(--surface-2); }
+.tab-chip-item.active { background: var(--accent-light); color: var(--accent-dark); }
+
 .tab-panel        { display: none; }
 .tab-panel.active { display: block; }
 
 /* ── Scanner Input ── */
 .scanner-row { display: flex; gap: 10px; align-items: stretch; }
 .scanner-input {
-  flex: 1; padding: 10px 14px; border: 2px solid var(--border-light); border-radius: 8px;
-  font-size: 15px; color: var(--text); background: #fff; transition: border-color .15s, box-shadow .15s;
-  font-family: var(--mono); direction: ltr; text-align: left;
+  flex: 1; padding: 10px 14px; border: 2px solid var(--border); border-radius: 8px;
+  font-size: 15px; color: var(--text-primary); background: var(--surface); transition: border-color .15s, box-shadow .15s;
+  font-family: var(--font-mono); direction: ltr; text-align: left;
 }
 .scanner-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(220,38,38,.12); }
-.scanner-input::placeholder { color: var(--text-muted); font-family: var(--font); }
+.scanner-input::placeholder { color: var(--text-muted); font-family: var(--font-body); }
 
 /* ── Counter badge ── */
 .counter-badge { display: flex; align-items: center; gap: 6px; background: var(--accent); border-radius: 8px; padding: 6px 12px; }
-.counter-badge .num { font-size: 20px; font-weight: 800; color: #fff; line-height: 1; font-family: var(--mono); }
-.counter-badge .lbl { font-size: 11px; color: rgba(255,255,255,.8); font-weight: 500; }
+.counter-badge .num { font-size: 20px; font-weight: 800; color: var(--on-accent); line-height: 1; font-family: var(--font-mono); }
+.counter-badge .lbl { font-size: 11px; color: var(--on-accent); opacity: .8; font-weight: 500; }
 
 /* ── Scan list ── */
 .scan-list { display: flex; flex-direction: column; gap: 5px; }
-.scan-chip { display: flex; align-items: center; justify-content: space-between; background: var(--bg2); border: 1px solid var(--border-light); border-radius: 7px; padding: 7px 12px; font-size: 13px; direction: ltr; }
-.scan-chip-num { font-weight: 600; color: var(--text); font-size: 14px; letter-spacing: .3px; font-family: var(--mono); }
+.scan-chip { display: flex; align-items: center; justify-content: space-between; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px; font-size: 13px; direction: ltr; }
+.scan-chip-num { font-weight: 600; color: var(--text-primary); font-size: 14px; letter-spacing: .3px; font-family: var(--font-mono); }
 .scan-chip-del { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 18px; line-height: 1; padding: 0 2px; transition: color .1s; }
 .scan-chip-del:hover { color: var(--accent); }
 
 /* ── Table ── */
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; direction: ltr; }
-thead th { text-align: center; padding: 10px 14px; background: var(--bg2); border-bottom: 2px solid var(--border-light); font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+thead th { text-align: center; padding: 10px 14px; background: var(--surface-2); border-bottom: 2px solid var(--border); font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
 thead th.col-check { width: 38px; }
-thead th, tbody td { border-inline-start: 1px solid var(--border-light); }
+thead th, tbody td { border-inline-start: 1px solid var(--border); }
 thead th:first-child, tbody td:first-child { border-inline-start: none; }
-tbody tr { border-bottom: 1px solid var(--border-light); }
+tbody tr { border-bottom: 1px solid var(--border); }
 tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: var(--bg2); }
+tbody tr:hover { background: var(--surface-2); }
 tbody td { padding: 10px 14px; font-size: 13px; text-align: center; white-space: nowrap; }
 tbody td.col-check { text-align: center; }
-.order-name   { font-weight: 700; font-size: 14px; color: var(--accent); font-family: var(--mono); }
-.order-link   { font-weight: 700; font-size: 14px; color: var(--accent); font-family: var(--mono); text-decoration: none; }
+.order-name   { font-weight: 700; font-size: 14px; color: var(--accent); font-family: var(--font-mono); }
+.order-link   { font-weight: 700; font-size: 14px; color: var(--accent); font-family: var(--font-mono); text-decoration: none; }
 .order-link:hover { text-decoration: underline; }
-.tracking-num { font-family: var(--mono); font-size: 13px; color: var(--text-sub); }
+.tracking-num { font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary); }
 input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
 
 /* ── Rejected rows (transition not allowed) ── */
-#resultsBody tr.row-rejected { background: var(--red-bg); }
+#resultsBody tr.row-rejected { background: var(--red-light); }
 .reject-reason { font-size: 10.5px; color: var(--red); white-space: normal; max-width: 230px; display: inline-block; line-height: 1.4; margin-top: 2px; direction: rtl; text-align: right; }
 
 /* ── Badges ── */
 .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-.badge-success { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-b); }
-.badge-danger  { background: var(--red-bg);  color: var(--red);   border: 1px solid var(--red-b); }
-.badge-warn    { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-b); }
-.badge-blue    { background: var(--blue-bg);  color: var(--blue);  border: 1px solid var(--blue-b); }
-.badge-neutral { background: var(--neutral-bg); color: var(--text-sub); border: 1px solid var(--neutral-b); }
-.badge-primary { background: var(--accent); color: #fff; }
+.badge-success { background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
+.badge-danger  { background: var(--red-light);  color: var(--red);   border: 1px solid var(--red-border); }
+.badge-warn    { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
+.badge-blue    { background: var(--blue-light);  color: var(--blue);  border: 1px solid var(--blue-border); }
+.badge-neutral { background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border); }
+.badge-primary { background: var(--accent); color: var(--on-accent); }
 
 /* ── Summary pills ── */
 .summary-pills { display: flex; gap: 8px; flex-wrap: wrap; }
-.pill { display: flex; flex-direction: column; align-items: center; background: var(--bg2); border: 1.5px solid var(--border-light); border-radius: 8px; padding: 8px 16px; min-width: 72px; }
-.pill-val { font-size: 20px; font-weight: 700; color: var(--text); font-family: var(--mono); }
-.pill-lbl { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+.pill { display: flex; flex-direction: column; align-items: center; background: var(--surface-2); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 16px; min-width: 72px; }
+.pill-val { font-size: 20px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+.pill-lbl { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 .pill.success .pill-val { color: var(--green); }
 .pill.danger  .pill-val { color: var(--accent); }
 
 /* ── Progress ── */
-.progress-wrap { background: var(--border-light); border-radius: 4px; height: 6px; overflow: hidden; }
+.progress-wrap { background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
 .progress-bar  { height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
 
 /* ── Action bar ── */
 .action-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.select-all-label { font-size: 12px; color: var(--text-sub); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.select-all-label { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
 /* ── Empty state ── */
 .empty-state { text-align: center; padding: 36px; color: var(--text-muted); font-size: 13px; }
 .empty-state .icon { font-size: 32px; margin-bottom: 10px; }
 
-/* ── Log Tab ── */
-.log-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.log-filter-select, .log-search-input {
-  padding: 7px 12px; border: 1.5px solid var(--border-light); border-radius: 7px;
-  font-size: 13px; color: var(--text); background: #fff; font-family: var(--font);
-  transition: border-color .15s;
-}
-.log-filter-select:focus, .log-search-input:focus { outline: none; border-color: var(--accent); }
-.log-search-input { flex: 1; min-width: 160px; }
-.log-search-input.has-value { border-color: var(--accent); background: var(--accent-bg); }
+/* ══ القسم الموحّد (فلاتر + جدول) — data-table-standard.md ══
+   ⚠️ ممنوع overflow:hidden على .unified-section أو أي أب لقوايم الفلاتر —
+   بيقص أي .ms-menu بيفتح ويطلع بره حدود الكارت. */
+.unified-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.section-divider { border-top: 1px solid var(--border); }
+
+.flt-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px;
+  background: var(--surface-2); cursor: pointer; user-select: none; transition: background .12s;
+  border-radius: var(--radius) var(--radius) 0 0; }
+.flt-header:hover { background: var(--surface-hover); }
+.flt-header-right { display: flex; align-items: center; gap: 10px; }
+.flt-icon { width: 34px; height: 22.5px; color: var(--text-muted); transition: color .2s; flex-shrink: 0; }
+.flt-icon.active { color: var(--accent); }
+.flt-toggle { font-size: 13px; color: var(--text-muted); transition: transform .25s; }
+.flt-toggle.open { transform: rotate(180deg); }
+.flt-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.flt-body.collapsed { display: none; }
+
+.clear-btn { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s;
+  white-space: nowrap; height: 34px;
+  border: 1px solid var(--red-border); color: var(--red); background: var(--red-light); }
+.clear-btn:hover { background: var(--red); color: var(--on-accent); border-color: var(--red); }
+.clear-btn.inactive { border-color: var(--border); color: var(--text-muted);
+  background: var(--surface-2); cursor: not-allowed; opacity: .6; }
+.clear-btn.inactive:hover { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
+
+.flt-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.flt-fg  { display: flex; flex-direction: column; gap: 3px; }
+.flt-flabel { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+
+/* ── Multi-select (multi-select-filter.md) ── */
+.ms-wrap { position: relative; }
+.ms-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-width: 190px; height: 34px; padding: 6px 10px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface); font-family: inherit; font-size: 12px; font-weight: 600;
+  color: var(--text-primary); cursor: pointer; transition: all .15s; white-space: nowrap; }
+.ms-btn:hover { border-color: var(--accent); }
+.ms-btn.has-selection { border-color: var(--accent); color: var(--accent-dark); background: var(--accent-light); }
+.ms-btn.open { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(220,38,38,.08); }
+.ms-btn .ms-count { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--on-accent);
+  background: var(--accent); border-radius: 20px; padding: 1px 7px; min-width: 18px; text-align: center; }
+.ms-btn .ms-arrow { font-size: 9px; color: var(--text-muted); transition: transform .2s; flex-shrink: 0; }
+.ms-btn.open .ms-arrow { transform: rotate(180deg); }
+.ms-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 200; width: 260px; max-width: 80vw;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 28px rgba(0,0,0,.14); display: none; flex-direction: column; overflow: hidden; }
+.ms-menu.open { display: flex; }
+.ms-ftr-top { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 7px 10px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.ms-ftr-clear { font-size: 11.5px; font-weight: 700; color: var(--red); background: none; border: none;
+  cursor: pointer; padding: 4px 6px; border-radius: 5px; }
+.ms-ftr-clear:hover { background: var(--red-light); }
+.ms-ftr-count { font-size: 11px; color: var(--text-muted); }
+.ms-selectall-row { display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+  border-bottom: 1px solid var(--border); background: var(--surface-2); font-size: 12px; font-weight: 700;
+  cursor: pointer; user-select: none; }
+.ms-selectall-row:hover { background: var(--surface-hover); }
+.ms-list { max-height: 220px; overflow-y: auto; padding: 4px; }
+.ms-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px;
+  font-size: 12.5px; cursor: pointer; user-select: none; transition: background .1s; }
+.ms-item:hover { background: var(--surface-2); }
+.ms-item.checked { background: var(--accent-light); }
+.ms-item input[type=checkbox], .ms-selectall-row input[type=checkbox] {
+  width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+.ms-item .ms-item-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-empty { padding: 18px; text-align: center; font-size: 12px; color: var(--text-muted); }
+
+.ms-chips-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ms-chips-row:empty { display: none; }
+.chips-label { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+.ms-chip { display: flex; align-items: center; gap: 5px; background: var(--accent-light); color: var(--accent-dark);
+  border: 1px solid var(--accent-border); border-radius: 20px; padding: 3px 6px 3px 10px; font-size: 11.5px; font-weight: 600; }
+.ms-chip button { border: none; background: rgba(220,38,38,.15); color: var(--accent-dark);
+  width: 16px; height: 16px; border-radius: 50%; font-size: 11px; cursor: pointer; line-height: 1; }
+.ms-chip button:hover { background: var(--accent); color: var(--on-accent); }
+
+/* ── مربع البحث — الأيقونة على الشمال إلزاميًا (overlap مع العربي لو يمين) ── */
+.search-wrap { position: relative; max-width: 280px; flex: 1; min-width: 200px; }
+.search-input { width: 100%; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 8px 12px 8px 34px; font-family: inherit; font-size: 13px; height: 36px; box-sizing: border-box;
+  outline: none; background: var(--surface); color: var(--text-primary); transition: border-color .15s, background .15s; }
+.search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(220,38,38,.08); }
+.search-input.has-value { border-color: var(--accent); background: var(--accent-light); }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 14px; color: var(--text-muted); pointer-events: none; }
+
+/* ── فلتر الفترة (date-range-filter.md) ── */
+.range-date-wrap input[type=date] { width: 160px; height: 34px; border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 6px 10px; font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-primary); background: var(--surface); outline: none; cursor: pointer; }
+.range-preset-wrap { position: relative; }
+.range-preset-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); background: var(--surface); cursor: pointer; height: 34px; white-space: nowrap; }
+.range-preset-btn.has-preset { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.pr-arrow { font-size: 9px; color: var(--text-muted); }
+.range-preset-menu { position: absolute; top: calc(100% + 4px); right: 0; background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  z-index: 200; min-width: 175px; padding: 4px; display: none; }
+.range-preset-menu.open { display: block; }
+.range-preset-item { padding: 7px 12px; font-size: 12px; cursor: pointer; border-radius: 6px;
+  color: var(--text-primary); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.range-preset-item:hover { background: var(--surface-2); }
+.range-preset-item.active { background: var(--accent-light); color: var(--accent); }
+.range-preset-item .pr-check { font-size: 11px; color: var(--accent); display: none; }
+.range-preset-item.active .pr-check { display: block; }
+.range-preset-sep { height: 1px; background: var(--border); margin: 3px 4px; }
+.range-preset-clear-row { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.range-preset-clear-row button { font-size: 11.5px; font-weight: 700; color: var(--red);
+  background: none; border: none; cursor: pointer; padding: 4px 6px; border-radius: 5px; }
+.range-preset-clear-row button:hover { background: var(--red-light); }
+
+/* ── صف الجدول: النتائج + الأكشنز + الطي ── */
+.tbl-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px;
+  background: var(--surface-2); cursor: pointer; user-select: none; transition: background .12s; flex-wrap: wrap; }
+.tbl-bar:hover { background: var(--surface-hover); }
+.tbl-bar-right, .tbl-bar-left { display: flex; align-items: center; gap: 8px; }
+.tbl-toggle { font-size: 13px; color: var(--text-muted); transition: transform .25s; }
+.tbl-toggle.open { transform: rotate(180deg); }
+.results-wrap { display: flex; align-items: center; gap: 8px; }
+.results-label { font-size: 14px; font-weight: 800; color: var(--text-primary); white-space: nowrap; }
+.results-count { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 34px;
+  padding: 0 10px; font-family: var(--font-mono); font-size: 17px; font-weight: 800;
+  color: var(--purple); background: var(--purple-light); border: 1.5px solid var(--purple-border); border-radius: var(--radius-sm); }
+/* ⚠️ العيّنة في المرجع بتحط max-height:1000px — بيقص صفحة سجل من ١٠٠ صف
+   (≈٣٦٠٠px). الرقم هنا أوسع من أي صفحة ممكنة عشان الطي يشتغل بلا قص. */
+.tbl-body-wrap { max-height: 20000px; overflow: hidden; transition: max-height .3s ease; border-radius: 0 0 var(--radius) var(--radius); }
+.tbl-body-wrap.collapsed { max-height: 0; }
+
+/* ── بانر التصدير المقصوص — ثابت فوق الجدول، مش توست بيختفي (Standards #30) ── */
+.export-warn { margin: 0 0 12px; padding: 10px 14px; border-radius: 9px;
+  background: var(--amber-light); border: 1px solid var(--amber);
+  color: var(--amber); font-size: 13px; font-weight: 600; line-height: 1.7; }
+
+/* ── جدول السجل ── */
 .log-table-wrap { overflow-x: auto; }
 .log-table { width: 100%; border-collapse: collapse; direction: ltr; }
-.log-table thead th { text-align: center; padding: 9px 12px; background: var(--bg2); border-bottom: 2px solid var(--border-light); font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
-.log-table thead th, .log-table tbody td { border-inline-start: 1px solid var(--border-light); }
+.log-table thead th { text-align: center; padding: 9px 12px; background: var(--surface-2); border-bottom: 2px solid var(--border); font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+.log-table thead th, .log-table tbody td { border-inline-start: 1px solid var(--border); }
 .log-table thead th:first-child, .log-table tbody td:first-child { border-inline-start: none; }
-.log-table tbody tr { border-bottom: 1px solid var(--border-light); }
+.log-table tbody tr { border-bottom: 1px solid var(--border); }
 .log-table tbody tr:last-child { border-bottom: none; }
-.log-table tbody tr:hover { background: var(--bg2); }
-.log-table tbody td { padding: 9px 12px; font-size: 12px; color: var(--text); text-align: center; white-space: nowrap; }
-.log-ts { font-family: var(--mono); font-size: 11px; color: var(--text-sub); }
+.log-table tbody tr:hover { background: var(--surface-2); }
+.log-table tbody td { padding: 9px 12px; font-size: 12px; color: var(--text-primary); text-align: center; white-space: nowrap; }
+.log-ts { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); direction: ltr; }
 .log-emp { font-size: 12px; font-weight: 600; }
-.log-order { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--accent); }
-.log-notes { font-size: 12px; color: var(--text-sub); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
-.pagination-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-.page-info { font-size: 13px; color: var(--text-sub); font-family: var(--mono); padding: 0 8px; }
-.page-btn { padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border); background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font); color: var(--text); transition: background .15s, border-color .15s; }
-.page-btn:hover:not(:disabled) { background: var(--accent-bg); border-color: var(--accent-b); color: var(--accent); }
+.log-order { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--accent); }
+
+/* ── الترتيب — الأيقونة تظهر بس عند التفعيل ── */
+.sortable-th { cursor: pointer; user-select: none; transition: background .12s, color .12s; }
+.sortable-th:hover  { background: var(--accent-light); color: var(--accent-dark); }
+.sortable-th.sorted { background: var(--accent-light); color: var(--accent-dark); }
+.sort-icon { display: inline-block; font-size: 10px; color: var(--accent); font-weight: 900; }
+.sort-icon.active { margin-inline-start: 4px; }
+
+.act-btn { padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+  background: var(--surface); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  color: var(--text-primary); transition: all .15s; white-space: nowrap; }
+.act-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+.pagination-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+.page-info { font-size: 13px; color: var(--text-secondary); font-family: var(--font-mono); padding: 0 8px; }
+.page-btn { padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font-body); color: var(--text-primary); transition: background .15s, border-color .15s; }
+.page-btn:hover:not(:disabled) { background: var(--accent-light); border-color: var(--accent-border); color: var(--accent); }
 .page-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── Spinner ── */
-.spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0; }
+.spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.3); border-top-color: var(--on-accent); border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0; }
 .spinner-dark { border-color: rgba(220,38,38,.2); border-top-color: var(--accent); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Toast ── */
 .toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 7px; align-items: center; }
-.toast { background: #1a1d27; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13px; box-shadow: var(--shadow-md); animation: slideUp .2s ease; white-space: nowrap; }
+.toast { background: var(--neutral-dark); color: var(--on-accent); padding: 9px 18px; border-radius: 8px; font-size: 13px; box-shadow: var(--shadow-md); animation: slideUp .2s ease; white-space: nowrap; }
 .toast.success { background: var(--green); }
 .toast.error   { background: var(--accent); }
 @keyframes slideUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
@@ -274,13 +501,13 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 .settings-overlay.open { display: flex; }
 .settings-modal { background: var(--surface); border-radius: var(--radius); width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,.18); overflow: hidden; border-top: 4px solid var(--accent); animation: modalIn .2s ease; }
 @keyframes modalIn { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.settings-modal-hdr { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1.5px solid var(--border-light); font-size: 15px; font-weight: 700; color: var(--accent); }
+.settings-modal-hdr { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1.5px solid var(--border); font-size: 15px; font-weight: 700; color: var(--accent); }
 .settings-modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-.settings-modal-ftr { padding: 12px 18px; border-top: 1.5px solid var(--border-light); display: flex; gap: 8px; justify-content: flex-end; }
+.settings-modal-ftr { padding: 12px 18px; border-top: 1.5px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
 
 /* ── ✕ Close button — إطار أحمر + خلفية حمراء (UI Standard v2) ── */
-.modal-close-x { background: var(--red-bg); border: 1.5px solid var(--red-b); color: var(--red); font-size: 14px; font-weight: 700; line-height: 1; padding: 4px 11px; border-radius: var(--radius-sm); font-family: var(--font); cursor: pointer; transition: all .15s; }
-.modal-close-x:hover { background: var(--red); color: #fff; border-color: var(--red); }
+.modal-close-x { background: var(--red-light); border: 1.5px solid var(--red-border); color: var(--red); font-size: 14px; font-weight: 700; line-height: 1; padding: 4px 11px; border-radius: var(--radius-sm); font-family: var(--font-body); cursor: pointer; transition: all .15s; }
+.modal-close-x:hover { background: var(--red); color: var(--on-accent); border-color: var(--red); }
 
 /* ── Modal Shell — About / Changelog (UI Standard v2) ── */
 .eco-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 600; display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -296,67 +523,67 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 }
 .eco-modal-hdr {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 18px; border-bottom: 1.5px solid var(--border-light);
+  padding: 14px 18px; border-bottom: 1.5px solid var(--border);
   font-size: 15px; font-weight: 700; color: var(--accent);
   background: var(--surface); flex-shrink: 0;
 }
 .eco-modal-body { overflow-y: auto; padding: 16px 20px; flex: 1; }
-.eco-modal-ftr { padding: 12px 18px; border-top: 1.5px solid var(--border-light); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
+.eco-modal-ftr { padding: 12px 18px; border-top: 1.5px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
 
 /* ── Settings ── */
 .settings-field { display: flex; flex-direction: column; gap: 5px; }
-.settings-label { font-size: 10px; font-weight: 700; color: var(--text-sub); text-transform: uppercase; letter-spacing: .5px; }
-.settings-input { padding: 9px 11px; border: 1.5px solid var(--border-light); border-radius: var(--radius-sm); font-size: 12px; color: var(--text); background: #fff; font-family: var(--mono); direction: ltr; width: 100%; outline: none; transition: border-color .15s; }
+.settings-label { font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; }
+.settings-input { padding: 9px 11px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-primary); background: var(--surface); font-family: var(--font-mono); direction: ltr; width: 100%; outline: none; transition: border-color .15s; }
 .settings-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(220,38,38,.1); }
 
 /* ── Changelog (UI Standard v2) ── */
 .cl-version-block { margin-bottom: 4px; }
 .cl-version-row  { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.cl-ver-badge    { font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 5px; background: var(--accent-bg); color: var(--accent-h); border: 1px solid var(--accent-b); direction: ltr; }
-.cl-ver-badge.old { background: var(--neutral-bg); color: var(--text-sub); border-color: var(--neutral-b); }
-.cl-ver-date     { font-size: 12px; color: var(--text-muted); font-family: var(--mono); direction: ltr; }
-.cl-items { list-style: none; display: flex; flex-direction: column; gap: 5px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); }
+.cl-ver-badge    { font-family: var(--font-mono); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 5px; background: var(--accent-light); color: var(--accent-dark); border: 1px solid var(--accent-border); direction: ltr; }
+.cl-ver-badge.old { background: var(--surface-2); color: var(--text-secondary); border-color: var(--border); }
+.cl-ver-date     { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); direction: ltr; }
+.cl-items { list-style: none; display: flex; flex-direction: column; gap: 5px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
 .cl-version-block:last-child .cl-items { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
-.cl-item  { display: flex; gap: 8px; font-size: 13px; align-items: flex-start; color: var(--text); }
+.cl-item  { display: flex; gap: 8px; font-size: 13px; align-items: flex-start; color: var(--text-primary); }
 .cl-tag   { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 5px; white-space: nowrap; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
-.cl-tag.new    { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-b); }
-.cl-tag.fix    { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-b); }
-.cl-tag.change { background: var(--blue-bg);  color: var(--blue);  border: 1px solid var(--blue-b); }
+.cl-tag.new    { background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
+.cl-tag.fix    { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
+.cl-tag.change { background: var(--blue-light);  color: var(--blue);  border: 1px solid var(--blue-border); }
 
 /* ── About Modal — content (UI Standard v2) ── */
-.about-sec { border: 1px solid var(--border-light); border-radius: var(--radius-sm); margin-bottom: 10px; overflow: hidden; }
-.about-sec > summary { padding: 11px 14px; font-weight: 700; font-size: 14px; color: var(--accent); background: var(--bg2); cursor: pointer; user-select: none; }
-.about-sec-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.75; color: var(--text); }
+.about-sec { border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 10px; overflow: hidden; }
+.about-sec > summary { padding: 11px 14px; font-weight: 700; font-size: 14px; color: var(--accent); background: var(--surface-2); cursor: pointer; user-select: none; }
+.about-sec-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.75; color: var(--text-primary); }
 .about-sec-body h4 { font-size: 12px; font-weight: 700; color: var(--accent); margin-top: 4px; }
 .about-sec-body ol, .about-sec-body ul { padding-inline-start: 20px; display: flex; flex-direction: column; gap: 4px; }
-.about-sec-body code { font-family: var(--mono); font-size: 11px; background: var(--bg2); border: 1px solid var(--border-light); border-radius: 4px; padding: 1px 5px; direction: ltr; display: inline-block; }
+.about-sec-body code { font-family: var(--font-mono); font-size: 11px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; direction: ltr; display: inline-block; }
 .about-sec-body table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.about-sec-body th, .about-sec-body td { padding: 6px 8px; border-bottom: 1px solid var(--border-light); text-align: right; }
+.about-sec-body th, .about-sec-body td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; }
 
 /* ── Login Screen (UI Standard v2 — full state machine) ── */
 .login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login-overlay.hidden { display: none; }
-.login-card { background: var(--surface); border: 1px solid var(--border-light); border-radius: 16px; box-shadow: 0 22px 70px rgba(220,38,38,.18); width: 100%; max-width: 400px; padding: 28px 26px 24px; position: relative; animation: loginIn .18s ease; }
+.login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 22px 70px rgba(220,38,38,.18); width: 100%; max-width: 400px; padding: 28px 26px 24px; position: relative; animation: loginIn .18s ease; }
 @keyframes loginIn { from { transform: translateY(6px) scale(.985); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 
-.login-settings-btn { position: absolute; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 5px; min-height: 38px; padding: 8px 12px; border-radius: 9px; border: 1.5px solid; background: var(--surface); font-family: var(--font); font-size: 12px; font-weight: 800; cursor: pointer; transition: all .15s; white-space: nowrap; }
-.login-settings-btn.ready   { border-color: var(--green); color: var(--green); background: var(--green-bg); }
-.login-settings-btn.missing { border-color: var(--red);   color: var(--red);   background: var(--red-bg); }
+.login-settings-btn { position: absolute; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 5px; min-height: 38px; padding: 8px 12px; border-radius: 9px; border: 1.5px solid; background: var(--surface); font-family: var(--font-body); font-size: 12px; font-weight: 800; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.login-settings-btn.ready   { border-color: var(--green); color: var(--green); background: var(--green-light); }
+.login-settings-btn.missing { border-color: var(--red);   color: var(--red);   background: var(--red-light); }
 .login-settings-btn:hover   { transform: translateY(-1px); }
-.login-version-tag { position: absolute; top: 58px; left: 18px; font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--text-sub); user-select: none; pointer-events: none; }
+.login-version-tag { position: absolute; top: 58px; left: 18px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--text-secondary); user-select: none; pointer-events: none; }
 
 .login-top   { padding-top: 12px; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .login-icon  { font-size: 34px; line-height: 1; margin-bottom: 14px; }
-.login-title { font-size: 19px; font-weight: 900; letter-spacing: -.1px; color: var(--text); }
-.login-desc  { font-size: 13px; color: var(--text-sub); font-weight: 600; margin-top: 5px; }
+.login-title { font-size: 19px; font-weight: 900; letter-spacing: -.1px; color: var(--text-primary); }
+.login-desc  { font-size: 13px; color: var(--text-secondary); font-weight: 600; margin-top: 5px; }
 .login-sub   { min-height: 22px; margin-top: 4px; color: var(--text-muted); font-size: 12px; font-weight: 600; text-align: center; line-height: 1.7; }
 
 .login-body  { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
 .login-field { display: flex; flex-direction: column; gap: 7px; }
-.login-field label { display: block; font-size: 11px; font-weight: 800; color: var(--text-sub); letter-spacing: .3px; }
-.login-field select { width: 100%; height: 58px; border: 1.5px solid var(--border-light); border-radius: 10px; background: var(--surface); color: var(--text); font-family: var(--font); font-size: 14px; font-weight: 600; outline: none; padding: 0 14px; transition: border-color .15s, box-shadow .15s; }
+.login-field label { display: block; font-size: 11px; font-weight: 800; color: var(--text-secondary); letter-spacing: .3px; }
+.login-field select { width: 100%; height: 58px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-primary); font-family: var(--font-body); font-size: 14px; font-weight: 600; outline: none; padding: 0 14px; transition: border-color .15s, box-shadow .15s; }
 .login-field select:focus    { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(220,38,38,.08); }
-.login-field select:disabled { opacity: .68; cursor: not-allowed; background: var(--bg2); }
+.login-field select:disabled { opacity: .68; cursor: not-allowed; background: var(--surface-2); }
 .login-status { min-height: 18px; font-size: 12px; font-weight: 700; color: var(--text-muted); line-height: 1.5; }
 .login-status.info  { color: var(--accent); }
 .login-status.warn  { color: var(--amber); }
@@ -365,36 +592,36 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 .pin-zone { display: none; flex-direction: column; gap: 12px; animation: pinZoneIn .16s ease; }
 .pin-zone.visible { display: flex; }
 @keyframes pinZoneIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-.pin-label { font-size: 12px; font-weight: 800; color: var(--text-sub); text-align: right; margin-top: 2px; }
+.pin-label { font-size: 12px; font-weight: 800; color: var(--text-secondary); text-align: right; margin-top: 2px; }
 .pin-slots { display: flex; justify-content: center; gap: 9px; direction: ltr; }
-.pin-slot { width: 48px; height: 48px; border-radius: 10px; border: 1.5px solid var(--border-light); background: var(--bg2); display: grid; place-items: center; font-family: var(--mono); font-size: 22px; font-weight: 800; color: var(--accent); transition: all .15s; user-select: none; }
+.pin-slot { width: 48px; height: 48px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface-2); display: grid; place-items: center; font-family: var(--font-mono); font-size: 22px; font-weight: 800; color: var(--accent); transition: all .15s; user-select: none; }
 .pin-slot.empty::before  { content: '_'; transform: translateY(-2px); color: var(--accent); opacity: .75; font-size: 18px; }
-.pin-slot.filled         { background: var(--accent-bg); border-color: var(--accent); }
+.pin-slot.filled         { background: var(--accent-light); border-color: var(--accent); }
 .pin-slot.filled::before { content: '●'; font-size: 17px; transform: translateY(-1px); color: var(--accent); opacity: 1; }
-.pin-slot.error          { border-color: var(--red); background: var(--red-bg); }
+.pin-slot.error          { border-color: var(--red); background: var(--red-light); }
 .pin-slot.error::before  { color: var(--red); }
 .pin-slots.shake { animation: pinShake .34s ease; }
 @keyframes pinShake { 0%,100% { transform: translateX(0); } 22% { transform: translateX(-5px); } 44% { transform: translateX(5px); } 66% { transform: translateX(-3px); } 88% { transform: translateX(3px); } }
 
 .pin-keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 1px 0 0; }
-.pin-key { min-height: 49px; border-radius: 10px; border: 1.5px solid var(--border-light); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 18px; font-weight: 800; cursor: pointer; transition: background .12s, color .12s, border-color .12s, transform .06s; display: flex; align-items: center; justify-content: center; }
-.pin-key:hover:not(:disabled)  { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+.pin-key { min-height: 49px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text-primary); font-family: var(--font-mono); font-size: 18px; font-weight: 800; cursor: pointer; transition: background .12s, color .12s, border-color .12s, transform .06s; display: flex; align-items: center; justify-content: center; }
+.pin-key:hover:not(:disabled)  { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 .pin-key:active:not(:disabled) { transform: translateY(1px); }
-.pin-key.utility { color: var(--red); background: var(--red-bg); border-color: var(--red-b); font-family: var(--font); font-size: 13px; font-weight: 900; }
-.pin-key.utility:hover:not(:disabled) { background: var(--red); color: #fff; border-color: var(--red); }
+.pin-key.utility { color: var(--red); background: var(--red-light); border-color: var(--red-border); font-family: var(--font-body); font-size: 13px; font-weight: 900; }
+.pin-key.utility:hover:not(:disabled) { background: var(--red); color: var(--on-accent); border-color: var(--red); }
 .pin-key:disabled { opacity: .55; cursor: not-allowed; }
 
-.login-alert { display: none; min-height: 38px; border-radius: 10px; border: 1px solid var(--red-b); background: var(--red-bg); color: var(--red); padding: 9px 12px; font-size: 12px; font-weight: 800; text-align: center; line-height: 1.6; }
+.login-alert { display: none; min-height: 38px; border-radius: 10px; border: 1px solid var(--red-border); background: var(--red-light); color: var(--red); padding: 9px 12px; font-size: 12px; font-weight: 800; text-align: center; line-height: 1.6; }
 .login-alert.visible { display: block; }
 
-.login-primary { display: none; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 58px; margin-top: 1px; border: none; border-radius: 10px; background: var(--accent); color: #fff; font-family: var(--font); font-size: 15px; font-weight: 900; cursor: pointer; transition: background .15s, opacity .15s, transform .06s; }
+.login-primary { display: none; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 58px; margin-top: 1px; border: none; border-radius: 10px; background: var(--accent); color: var(--on-accent); font-family: var(--font-body); font-size: 15px; font-weight: 900; cursor: pointer; transition: background .15s, opacity .15s, transform .06s; }
 .login-primary.visible          { display: inline-flex; }
-.login-primary:hover:not(:disabled)  { background: var(--accent-h); }
+.login-primary:hover:not(:disabled)  { background: var(--accent-dark); }
 .login-primary:active:not(:disabled) { transform: translateY(1px); }
 .login-primary:disabled { opacity: .56; cursor: not-allowed; }
-.login-secondary { display: none; align-items: center; justify-content: center; width: 100%; min-height: 42px; border-radius: 10px; border: 1px solid var(--border-light); background: var(--surface); color: var(--text-sub); font-family: var(--font); font-size: 12px; font-weight: 800; cursor: pointer; transition: all .15s; }
+.login-secondary { display: none; align-items: center; justify-content: center; width: 100%; min-height: 42px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-family: var(--font-body); font-size: 12px; font-weight: 800; cursor: pointer; transition: all .15s; }
 .login-secondary.visible { display: inline-flex; }
-.login-secondary:hover   { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+.login-secondary:hover   { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
 
 @media (max-width: 600px) {
   .app-header { flex-direction: column; align-items: flex-start; }
@@ -404,26 +631,32 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 </head>
 <body>
 
-<!-- ══ LOGIN OVERLAY ════════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════
+     §LOGIN — شاشة الدخول (خطوتان — الـ PIN مخفي لحد اختيار الاسم)
+     ══════════════════════════════════════════════════════ -->
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
 
     <button class="login-settings-btn missing" id="loginSettingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
-    <span class="login-version-tag">v3.1.1</span>
+    <!-- رقم النسخة نص ثابت بدون onclick (مفيش وصول للـ Changelog قبل الدخول)،
+         وبيتكتب من TOOL_VERSION عن طريق renderVersionUI() — مش hardcoded -->
+    <span class="login-version-tag" id="loginVersionText">v—</span>
 
     <div class="login-top">
       <div class="login-icon">↩️</div>
       <div class="login-title">Bosta Orders Returned Scanner</div>
       <div class="login-desc">مسح أرقام التتبع وتحديث حالة الأوردر S1/S2 مباشرة</div>
-      <div class="login-sub" id="loginSub">اختر اسمك للمتابعة</div>
+      <!-- السطر الديناميكي — فاضي في mode='employee'، الإرشاد بقى في الـ placeholder -->
+      <div class="login-sub" id="loginSub"></div>
     </div>
 
     <div class="login-body">
 
       <div class="login-field">
-        <label for="loginSelect">الموظف</label>
+        <!-- ⚠️ الـ <label> اتشال بالكامل والإرشاد بقى في الـ placeholder بس
+             (Standards #34) — كان نفس النص مكرر في تلات أماكن حوالين عنصر واحد -->
         <select id="loginSelect" onchange="handleEmployeeChange()" disabled>
-          <option value="">— اختر —</option>
+          <option value="">اختر اسمك للمتابعة</option>
         </select>
         <div class="login-status warn" id="loginStatus">الإعدادات غير مكتملة — افتح الإعدادات أولاً.</div>
       </div>
@@ -466,37 +699,52 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
   </div>
 </div>
 
-<!-- ══ APP SHELL ════════════════════════════════════════════════════════════════ -->
-<div class="app-wrapper">
+<!-- ══════════════════════════════════════════════════════
+     §SHELL — الهيدر + شريط التابات (Freeze on Scroll) + النوافذ + التوست
+     ══════════════════════════════════════════════════════ -->
+<div class="container">
 
-  <!-- Header -->
-  <div class="app-header">
-    <div class="app-title">
-      <div class="app-icon">↩️</div>
-      <div class="app-title-text">
-        <h1>Bosta Orders Returned Scanner</h1>
-        <span>مسح أرقام التتبع وتحديث حالة الأوردر S1/S2 مباشرة على شوبيفاي</span>
+  <!-- الهيدر وشريط التابات جوه wrapper واحد sticky — tabs-and-modals.md § 1b -->
+  <div class="sticky-header-wrap" id="stickyWrap">
+
+    <div class="app-header">
+      <div class="app-title">
+        <div class="app-icon">↩️</div>
+        <div class="app-title-text">
+          <h1>Bosta Orders Returned Scanner</h1>
+          <span>مسح أرقام التتبع وتحديث حالة الأوردر S1/S2 مباشرة على شوبيفاي</span>
+        </div>
+      </div>
+
+      <!-- Chip التاب الحالي — ما يظهرش إلا وقت الـ Sticky (شريط التابات بيتقفل) -->
+      <div class="active-tab-chip" id="activeTabChip" onclick="toggleTabChipMenu(event)">
+        <span id="activeTabChipLabel">📷 السكانر</span><span class="chip-arrow">▾</span>
+        <div class="tab-chip-menu" id="tabChipMenu"></div>
+      </div>
+
+      <div class="app-header-btns">
+        <button class="hbtn active-user" id="activeUserBtn" onclick="doLogout()">👤 —</button>
+        <button class="hbtn" onclick="openAbout()">ℹ️ عن الأداة</button>
+        <button class="hbtn ver-btn" onclick="openChangelog()" id="verBtn">v— 📋</button>
+        <!-- v3.3.0 — حارس **حد أدنى** مش تطابق حرفي: بيولّع بس لو الـ Worker
+             أقدم من MIN_WORKER_VERSION. المقارنة الحرفية كانت بتولّع تحذير
+             كاذب دايم (النسختين مستقلتين بالتصميم)، والتحذير الدايم بيتجاهل. -->
+        <button class="hbtn warn" id="verStaleBtn" style="display:none;border-color:var(--amber);color:var(--amber);background:var(--amber-light);"
+                onclick="showWorkerStale()">⚠️ الـ Worker نسخة قديمة</button>
+        <button class="hbtn" id="settingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
       </div>
     </div>
-    <div class="app-header-btns">
-      <button class="hbtn active-user" id="activeUserBtn" onclick="doLogout()">👤 —</button>
-      <button class="hbtn" onclick="openAbout()">ℹ️ عن الأداة</button>
-      <button class="hbtn ver-btn" onclick="openChangelog()" id="verBtn">v3.2.0 📋</button>
-      <!-- v3.2.0 — بيظهر بس لو نسخة الـ Worker مختلفة عن نسخة الواجهة
-           (بيكشف "الـ deploy نجح والأداة زي ما هي" / نسخة مستنية Promote) -->
-      <button class="hbtn" id="verMismatchBtn" style="display:none;border-color:var(--amber);color:var(--amber);background:var(--amber-bg);"
-              onclick="showVersionMismatch()">⚠️ نسخة الـ Worker مختلفة</button>
-      <button class="hbtn" id="settingsBtn" onclick="openSettings()">⚙️ الإعدادات</button>
+
+    <div class="main-tabs-bar" id="mainTabsBar">
+      <button class="main-tab-btn active" id="tabBtnScanner" onclick="switchMainTab('scanner')">📷 السكانر</button>
+      <button class="main-tab-btn" id="tabBtnLog" onclick="switchMainTab('log')">📋 السجل</button>
     </div>
+
   </div>
 
-  <!-- Tabs -->
-  <div class="main-tabs-bar">
-    <button class="main-tab-btn active" id="tabBtnScanner" onclick="switchMainTab('scanner')">📷 السكانر</button>
-    <button class="main-tab-btn" id="tabBtnLog" onclick="switchMainTab('log')">📋 السجل</button>
-  </div>
-
-  <!-- ══ TAB: Scanner ══ -->
+  <!-- ══════════════════════════════════════════════════════
+       §TOOL — تاب السكانر: الإدخال + النتائج + التحديث
+       ══════════════════════════════════════════════════════ -->
   <div id="tab-scanner" class="tab-panel active">
 
     <!-- Step 1: Scan -->
@@ -561,7 +809,7 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
         </div>
 
         <div id="updateProgress" style="display:none;">
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-sub);margin-bottom:4px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px;">
             <span>جاري التحديث...</span>
             <span id="progressText">0 / 0</span>
           </div>
@@ -590,38 +838,192 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 
   </div><!-- /tab-scanner -->
 
-  <!-- ══ TAB: Log ══ -->
+  <!-- ══════════════════════════════════════════════════════
+       §LOG — تاب السجل: القسم الموحّد (فلاتر + جدول) بمعيار
+       `data-table-standard.md` — كارت واحد، كل الفلاتر multi-select
+       ══════════════════════════════════════════════════════ -->
   <div id="tab-log" class="tab-panel">
-    <div class="card">
-      <div class="card-header">
-        <h2>سجل العمليات</h2>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline btn-sm" onclick="fetchLog()">🔄 تحديث</button>
-          <button class="btn btn-outline btn-sm" onclick="exportLogXLSX()">📥 تصدير XLSX</button>
+    <div class="unified-section">
+
+      <!-- هيدر الفلاتر — أيقونة بس بدون كلمة "الفلاتر" -->
+      <div class="flt-header" onclick="toggleFilters()">
+        <div class="flt-header-right">
+          <span class="flt-toggle open" id="fltToggleIcon">▲</span>
+          <svg class="flt-icon" id="fltIcon" viewBox="0 0 36 24" fill="none"
+               stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="2 3 13 3 8.3 10.2 8.3 19 6.7 19 6.7 10.2 2 3"></polygon>
+            <line x1="18" y1="5"  x2="33" y2="5"></line>
+            <line x1="18" y1="11" x2="29" y2="11"></line>
+            <line x1="18" y1="17" x2="25" y2="17"></line>
+          </svg>
+        </div>
+        <button class="clear-btn inactive" id="clearAllBtn"
+                onclick="event.stopPropagation(); clearAllFilters();">✕ مسح كل الفلاتر</button>
+      </div>
+
+      <div class="flt-body" id="fltBody">
+
+        <!-- صف 1 — فلاتر الاختيار المتعدد -->
+        <div class="flt-row">
+          <div class="flt-fg">
+            <span class="flt-flabel">الموظف</span>
+            <div class="ms-wrap" id="msWrap-emp">
+              <button class="ms-btn" id="msBtn-emp" data-default-label="كل الموظفين" onclick="msToggle('emp')">
+                <span id="msBtnLabel-emp">كل الموظفين</span><span class="ms-arrow">▾</span>
+              </button>
+              <div class="ms-menu" id="msMenu-emp">
+                <div class="ms-ftr-top">
+                  <button class="ms-ftr-clear" onclick="msClear('emp')">مسح الاختيار</button>
+                  <span class="ms-ftr-count" id="msFtrCount-emp"></span>
+                </div>
+                <div class="ms-selectall-row" onclick="msToggleSelectAll('emp')">
+                  <input type="checkbox" id="msSelectAll-emp"
+                    onclick="event.stopPropagation()" onchange="msToggleSelectAll('emp', this.checked)">
+                  <span id="msSelectAllLabel-emp">تحديد الكل</span>
+                </div>
+                <div class="ms-list" id="msList-emp"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flt-fg">
+            <span class="flt-flabel">النتيجة</span>
+            <div class="ms-wrap" id="msWrap-result">
+              <button class="ms-btn" id="msBtn-result" data-default-label="كل النتائج" onclick="msToggle('result')">
+                <span id="msBtnLabel-result">كل النتائج</span><span class="ms-arrow">▾</span>
+              </button>
+              <div class="ms-menu" id="msMenu-result">
+                <div class="ms-ftr-top">
+                  <button class="ms-ftr-clear" onclick="msClear('result')">مسح الاختيار</button>
+                  <span class="ms-ftr-count" id="msFtrCount-result"></span>
+                </div>
+                <div class="ms-selectall-row" onclick="msToggleSelectAll('result')">
+                  <input type="checkbox" id="msSelectAll-result"
+                    onclick="event.stopPropagation()" onchange="msToggleSelectAll('result', this.checked)">
+                  <span id="msSelectAllLabel-result">تحديد الكل</span>
+                </div>
+                <div class="ms-list" id="msList-result"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flt-fg">
+            <span class="flt-flabel">الماكينة</span>
+            <div class="ms-wrap" id="msWrap-machine">
+              <button class="ms-btn" id="msBtn-machine" data-default-label="S1 و S2" onclick="msToggle('machine')">
+                <span id="msBtnLabel-machine">S1 و S2</span><span class="ms-arrow">▾</span>
+              </button>
+              <div class="ms-menu" id="msMenu-machine">
+                <div class="ms-ftr-top">
+                  <button class="ms-ftr-clear" onclick="msClear('machine')">مسح الاختيار</button>
+                  <span class="ms-ftr-count" id="msFtrCount-machine"></span>
+                </div>
+                <div class="ms-selectall-row" onclick="msToggleSelectAll('machine')">
+                  <input type="checkbox" id="msSelectAll-machine"
+                    onclick="event.stopPropagation()" onchange="msToggleSelectAll('machine', this.checked)">
+                  <span id="msSelectAllLabel-machine">تحديد الكل</span>
+                </div>
+                <div class="ms-list" id="msList-machine"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- صف 2 — بحث ← فترة سريعة ← من ← إلى -->
+        <div class="flt-row">
+          <div class="search-wrap">
+            <input type="text" class="search-input" id="logSearch"
+                   oninput="onLogSearchInput(this)" />
+            <span class="search-icon">🔍</span>
+          </div>
+
+          <div class="flt-fg">
+            <span class="flt-flabel">فترة سريعة</span>
+            <div class="range-preset-wrap" id="rangePresetWrap">
+              <button class="range-preset-btn" id="rangePresetBtn" onclick="toggleRangePresetMenu(event)">
+                <span id="rangePresetLabel">⚡ اختار فترة</span><span class="pr-arrow">▾</span>
+              </button>
+              <div class="range-preset-menu" id="rangePresetMenu">
+                <div class="range-preset-clear-row">
+                  <button onclick="event.stopPropagation(); clearRangePreset();">✕ مسح الاختيار</button>
+                </div>
+                <div class="range-preset-item" data-preset="today"     onclick="applyRangePreset('today')"><span>اليوم</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-item" data-preset="yesterday" onclick="applyRangePreset('yesterday')"><span>أمس</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-sep"></div>
+                <div class="range-preset-item" data-preset="last3"  onclick="applyRangePreset('last3')"><span>آخر 3 أيام</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-item" data-preset="last7"  onclick="applyRangePreset('last7')"><span>آخر 7 أيام</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-item" data-preset="last30" onclick="applyRangePreset('last30')"><span>آخر 30 يوم</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-item" data-preset="last90" onclick="applyRangePreset('last90')"><span>آخر 90 يوم</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-sep"></div>
+                <div class="range-preset-item" data-preset="thisMonth"   onclick="applyRangePreset('thisMonth')"><span>الشهر الحالي</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-item" data-preset="lastMonth"   onclick="applyRangePreset('lastMonth')"><span>الشهر السابق</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-item" data-preset="thisQuarter" onclick="applyRangePreset('thisQuarter')"><span>الربع الحالي</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-sep"></div>
+                <div class="range-preset-item" data-preset="thisYear" onclick="applyRangePreset('thisYear')"><span>العام الحالي</span><span class="pr-check">✓</span></div>
+                <div class="range-preset-item" data-preset="lastYear" onclick="applyRangePreset('lastYear')"><span>العام السابق</span><span class="pr-check">✓</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flt-fg">
+            <span class="flt-flabel">من تاريخ</span>
+            <div class="range-date-wrap">
+              <input type="date" id="rangeDateFrom" onclick="this.showPicker&&this.showPicker();" onchange="onRangeDateChange()">
+            </div>
+          </div>
+
+          <div class="flt-fg">
+            <span class="flt-flabel">إلى تاريخ</span>
+            <div class="range-date-wrap">
+              <input type="date" id="rangeDateTo" onclick="this.showPicker&&this.showPicker();" onchange="onRangeDateChange()">
+            </div>
+          </div>
+        </div>
+
+        <!-- صف 3+ — chips: سطر لكل فلتر، واسم الفلتر مرة واحدة في أوله -->
+        <div class="ms-chips-row" id="chipsRow-emp"></div>
+        <div class="ms-chips-row" id="chipsRow-result"></div>
+        <div class="ms-chips-row" id="chipsRow-machine"></div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- صف الجدول — النتائج + الأكشنز + الطي -->
+      <div class="tbl-bar" onclick="toggleTable()">
+        <div class="tbl-bar-right">
+          <span class="tbl-toggle open" id="tblToggleIcon">▲</span>
+          <div class="results-wrap">
+            <span class="results-label">النتائج:</span>
+            <span class="results-count" id="filteredCount">—</span>
+          </div>
+        </div>
+        <div class="tbl-bar-left">
+          <button class="act-btn" onclick="event.stopPropagation(); fetchLog();">↺ تحديث</button>
+          <button class="act-btn" onclick="event.stopPropagation(); exportLogXLSX();">⬇ تصدير XLSX</button>
         </div>
       </div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-        <div class="log-filters">
-          <select class="log-filter-select" id="logFilterEmployee" onchange="onLogFilter()">
-            <option value="">كل الموظفين</option>
-          </select>
-          <input class="log-search-input" type="text" id="logSearch" placeholder="بحث برقم الأوردر..." oninput="onLogFilter(); toggleSearchActiveState(this);" />
+
+      <div class="tbl-body-wrap" id="tblBodyWrap">
+        <div style="padding:14px 16px 0;">
+          <!-- بانر ثابت — مش توست: التوست بيختفي والملف بيفضل ناقص على الديسك -->
+          <div id="logExportWarn" class="export-warn" style="display:none;"></div>
         </div>
         <div class="log-table-wrap">
           <table class="log-table">
             <thead>
               <tr>
-                <th>التاريخ والوقت</th>
-                <th>الموظف</th>
-                <th>الأوردر</th>
-                <th>الماكينة</th>
+                <th class="sortable-th" data-sort-key="date"    onclick="toggleSort('date')">التاريخ<span class="sort-icon" data-sort-key="date"></span></th>
+                <th class="sortable-th" data-sort-key="time"    onclick="toggleSort('time')">الوقت<span class="sort-icon" data-sort-key="time"></span></th>
+                <th class="sortable-th" data-sort-key="emp"     onclick="toggleSort('emp')">الموظف<span class="sort-icon" data-sort-key="emp"></span></th>
+                <th class="sortable-th" data-sort-key="order"   onclick="toggleSort('order')">الأوردر<span class="sort-icon" data-sort-key="order"></span></th>
+                <th class="sortable-th" data-sort-key="machine" onclick="toggleSort('machine')">الماكينة<span class="sort-icon" data-sort-key="machine"></span></th>
                 <th>التحديث</th>
-                <th>النتيجة</th>
-                <th>التتبع</th>
+                <th class="sortable-th" data-sort-key="result"  onclick="toggleSort('result')">النتيجة<span class="sort-icon" data-sort-key="result"></span></th>
+                <th class="sortable-th" data-sort-key="tn"      onclick="toggleSort('tn')">التتبع<span class="sort-icon" data-sort-key="tn"></span></th>
               </tr>
             </thead>
             <tbody id="logBody">
-              <tr><td colspan="7"><div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل</div></div></td></tr>
+              <tr><td colspan="8"><div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل</div></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -631,10 +1033,11 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
           <button class="page-btn" id="btnNextPage" onclick="goPage(1)">التالي ←</button>
         </div>
       </div>
+
     </div>
   </div><!-- /tab-log -->
 
-</div><!-- /app-wrapper -->
+</div><!-- /container -->
 
 <!-- ══ SETTINGS MODAL ══ -->
 <div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOnBackdrop(event)">
@@ -644,24 +1047,19 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
       <button class="modal-close-x" onclick="closeSettings()">✕</button>
     </div>
     <div class="settings-modal-body">
-      <div class="settings-field">
-        <label class="settings-label">WORKER URL</label>
-        <input class="settings-input" id="cfgUrl" type="text" />
-      </div>
+      <!-- ⛔ WORKER URL و ADMIN WORKER URL اتشالوا من هنا نهائيًا (Standards #28):
+           الاتنين مش سر وقيمتهم ثابتة من وقت إنشاء الـ Worker، فبقوا constants
+           في §CONFIG. الحماية الحقيقية في WORKER_SECRET + CORS allowlist. -->
       <div class="settings-field">
         <label class="settings-label">WORKER SECRET</label>
         <input class="settings-input" id="cfgSecret" type="password" />
-      </div>
-      <div class="settings-field">
-        <label class="settings-label">ADMIN WORKER URL</label>
-        <input class="settings-input" id="cfgAdminUrl" type="text" />
       </div>
 
       <!-- ══ v3.2.0 — فحص النظام ══════════════════════════════════════════
            بينادي ?action=diag: متغيرات الـ Worker، صلاحيات تطبيق شوبيفاي،
            الـ LOCATION_ID، بوسطة، D1، والـ CORS. صفر كتابة، صفر أثر جانبي.
            الفحص ده كان هيكشف عطل 19→23-08 (صلاحية write_returns) في ثواني. -->
-      <div class="settings-field" style="border-top:1.5px solid var(--border-light);padding-top:12px;margin-top:4px;">
+      <div class="settings-field" style="border-top:1.5px solid var(--border);padding-top:12px;margin-top:4px;">
         <label class="settings-label">فحص النظام</label>
         <button class="btn btn-outline btn-sm" id="diagBtn" onclick="runDiag()">🩺 افحص الأداة والاتصالات</button>
         <div id="diagResult" style="margin-top:10px;font-size:12px;line-height:1.7;"></div>
@@ -730,7 +1128,8 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
             <tr><td><code>update</code></td><td>إعادة تحقق دفاعي، ثم لكل أوردر لوحده: (RTO) <code>orderCancel</code> → <code>metafieldsSet</code> | (مرتجع بعد التسليم) <code>metafieldsSet</code> → <code>reverseFulfillmentOrderDispose</code> + D1 log (نجاح أو فشل)</td></tr>
             <tr><td><code>diag</code></td><td><b>جديد v3.2.0</b> — فحص ذاتي بدون أي كتابة: متغيرات الـ Worker وأسماؤها، صلاحيات تطبيق شوبيفاي (<code>write_returns</code>…)، الـ LOCATION_ID، بوسطة، D1، والـ Origin</td></tr>
             <tr><td><code>get_config</code></td><td><b>جديد v3.2.0</b> — نسخة الـ Worker؛ الواجهة بتقارنها بنسختها وبتحذّر لو مختلفين</td></tr>
-            <tr><td><code>get_logs</code> / <code>_count</code> / <code>_export</code></td><td>سجل هذه الأداة فقط (جديد + قديم)</td></tr>
+            <tr><td><code>get_logs</code> / <code>_count</code></td><td>سجل هذه الأداة فقط (جديد + قديم) — فلترة server-side بقوايم: <code>employees</code> · <code>results</code> · <code>machines</code> + <code>search</code> + <code>dateFrom</code>/<code>dateTo</code>، وصفحة 100 صف</td></tr>
+            <tr><td><code>get_logs_export</code></td><td><b>اتغيّر v3.3.0</b> — بيرجّع <code>{ entries, cap, total, truncated }</code>. الصفوف لوحدها كانت بتخلي الواجهة تقول "تم التصدير ✓" على ملف مقصوص عند السقف</td></tr>
           </table>
         </div>
       </details>
@@ -740,10 +1139,14 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
         <div class="about-sec-body">
           <h4>FEATURE MAP</h4>
           <ul>
+            <li><code>§STYLES</code> — توكنز <code>:root</code> (الثيم الأحمر = override للـ accent بس) + كل CSS</li>
+            <li><code>§SHELL</code> / <code>§SHELL-JS</code> — الهيدر وشريط التابات جوّه <code>.sticky-header-wrap</code> (Freeze on Scroll بعتبة <b>مقيسة</b>) + chip التاب + النوافذ + التوست + حارس نسخة الـ Worker</li>
+            <li><code>§LOGIN</code> / <code>§AUTH-JS</code> — شاشة الدخول على خطوتين + آلة الحالات الرباعية</li>
+            <li><code>§CONFIG</code> — <code>TOOL_VERSION</code> · <code>MIN_WORKER_VERSION</code> · روابط الـ Workers كـ constants · <code>apiGet</code>/<code>apiPost</code> · صيغ التاريخ الموحّدة</li>
+            <li><code>§DIAG-JS</code> — زرار الفحص الذاتي (<code>?action=diag</code>) في الإعدادات</li>
             <li><code>§SCAN</code> — سكانر جن + إضافة يدوية لأرقام التتبع</li>
-            <li><code>§LOOKUP</code> — استعلام بوسطة + شوبيفاي دفعة واحدة + <code>validateTransition()</code></li>
-            <li><code>§UPDATE</code> — تحديث الميتافيلد أوردر أوردر مع الأكشنز الإضافية (<code>orderCancel</code> / <code>reverseFulfillmentOrderDispose</code>)</li>
-            <li><code>§LOG</code> — تاب السجل، pagination، بحث، تصدير XLSX</li>
+            <li><code>§TOOL-JS</code> — <code>lookup</code> · جدول النتائج · <code>startUpdate</code> (٣ حالات) · تصدير النتائج</li>
+            <li><code>§LOG-JS</code> — تاب السجل: القسم الموحّد (فلاتر multi-select + مدى تاريخ + ترتيب ٣ حالات + صف النتائج) و pagination وتصدير XLSX ببانر التقصّ</li>
           </ul>
 
           <h4>KEY VARIABLES</h4>
@@ -751,6 +1154,10 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
             <li><code>currentEmployee</code> — في الذاكرة فقط، أبدًا في <code>localStorage</code></li>
             <li><code>TOOL_NAME = 'bosta_return'</code> — قيمة <code>tool</code> لأحداث الدخول/الخروج فقط</li>
             <li><code>extra.sourceTool = 'bosta_orders_returned_scanner'</code> — يفلتر سجل هذه الأداة داخل <code>tool = 'metafields_change'</code> المشترك</li>
+            <li><code>TOOL_VERSION</code> — مصدر <b>واحد</b> لرقم نسخة الواجهة، بيتقرا منه زرار الهيدر وبادج الـ Changelog ونص شاشة الدخول عبر <code>renderVersionUI()</code></li>
+            <li><code>MIN_WORKER_VERSION</code> — أقل نسخة Worker الواجهة بتشتغل معاها. <b>مالهاش أي علاقة بـ <code>TOOL_VERSION</code></b> — دي بتوصف الصفحة ودي بتوصف أقل Worker مقبول</li>
+            <li><code>WORKER_URL</code> / <code>ADMIN_WORKER_URL</code> — constants في <code>§CONFIG</code>، مش حقول إعدادات ولا <code>localStorage</code></li>
+            <li><code>LS_SECRET</code> — المفتاح الوحيد في <code>localStorage</code> (السر الفعلي، والريبو Public)</li>
           </ul>
 
           <h4>NOTES</h4>
@@ -759,7 +1166,10 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
             <li>أي أوردر توصّل لمرحلة التنفيذ الفعلي (نجح أو فشل) بيتسجل في D1 دايمًا — عشان الإلغاء (<code>orderCancel</code>) إجراء لا رجعة فيه، والفشل الجزئي لازم يبان في السجل.</li>
             <li><b>v3.2.0 — قاعدة "مفيش نجاح من غير دليل":</b> <code>shopifyGQL()</code> في الـ Worker بترمي خطأ على كل أنواع الفشل (HTTP status، رد مش JSON، أخطاء GraphQL عليا بـ <code>data:null</code>). قبل كده أخطاء الصلاحيات كانت بتعدّي كنجاح لأن <code>userErrors</code> بتبقى فاضية لما <code>data</code> ترجع <code>null</code>.</li>
             <li>الاسترجاع بيتم بالكمية <b>المتبقية</b> (<code>totalQuantity − Σ dispositions</code>) — الـ <code>reverseFulfillmentOrder</code> بيفضل <code>OPEN</code> حتى بعد الاسترجاع الكامل، فشرط <code>OPEN</code> لوحده مش بيمنع الاسترجاع المزدوج.</li>
-            <li>الصلاحيات المطلوبة على تطبيق شوبيفاي: <code>read_orders</code> · <code>write_orders</code> · <code>read_returns</code> · <code>write_returns</code>. شغّل <code>diag</code> من الإعدادات بعد أي تغيير في التطبيق.</li>
+            <li>الصلاحيات المطلوبة على تطبيق شوبيفاي: <code>read_orders</code> · <code>write_orders</code> · <code>read_returns</code> · <code>write_returns</code> · <code>read_inventory</code> · <code>write_inventory</code> · <code>read_locations</code>. شغّل <code>diag</code> من الإعدادات بعد أي تغيير في التطبيق.</li>
+            <li><b>v3.3.0 — التحقق من الإلغاء بيستنى، مايقراش فورًا:</b> <code>orderCancel</code> بترجّع Job، والقراءة الفورية بعدها بتفشل دايمًا تقريبًا فكل إلغاء ناجح كان بيطلع أصفر. دلوقتي backoff متصاعد + فحص <code>job(id){ done }</code> نفسه ووقوف على أول تأكيد، و<code>{ jobDone, attempts, waitedMs }</code> بترجع في الرد وفي D1.</li>
+            <li><b>v3.3.0 — رقمين تتبع لنفس الأوردر:</b> الـ Worker بيتخطى التكرار في نفس الدفعة بدل ما يلغي الأوردر مرتين على لقطة حالة قديمة.</li>
+            <li>الأداة بتقبل <b>أي</b> نوع شحنة من بوسطة غير <code>Send</code> (قرار مقصود) — حراسات S1/S2/<code>returnStatus</code> هي اللي بترفض اللي مالوش مسار صحيح، لأن قايمة أنواع بوسطة بتتوسّع من غير إشعار.</li>
             <li>فشل الكتابة في D1 بيرجع في الرد كـ <code>logged:false</code> وبيظهر تنبيه — مش بيتبلع.</li>
           </ul>
         </div>
@@ -780,7 +1190,25 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 
       <div class="cl-version-block">
         <div class="cl-version-row">
-          <span class="cl-ver-badge">v3.2.0</span>
+          <span class="cl-ver-badge" id="clLatestBadge">v—</span>
+          <span class="cl-ver-date">05-09-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>كل إلغاء ناجح كان بيطلع أصفر "مش مؤكَّد"</b> — <code>orderCancel</code> بترجّع Job، والتحقق كان بينام مدد ثابتة ويقرا الأوردر من غير ما يبص على الـ Job نفسه، فالقراءة بتسبق التأكيد. دلوقتي backoff متصاعد + فحص <code>job(id){ done }</code> مجمّع + وقوف على أول تأكيد، و<code>{ jobDone, attempts, waitedMs }</code> بترجع في الرد وفي السجل</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>تصدير السجل كان بيتقص عند السقف في السكوت</b> — الأداة كانت بتقول "تم التصدير ✓" على ملف ناقص. دلوقتي فيه بانر ثابت فوق الجدول بالرقمين (المصدَّر / الإجمالي)، ورسالة النجاح بتظهر بس لو الملف كامل</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>رقمين تتبع لنفس الأوردر</b> كانوا بيلغوه مرتين على لقطة حالة قديمة — التكرار بقى بيتخطى في نفس الدفعة برسالة واضحة</li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span> <b>تاب السجل بقى قسم موحّد بالمعيار:</b> كل الفلاتر اختيار متعدد (الموظف · النتيجة · الماكينة) + فلتر فترة (بدون افتراضي) + بحث + chips + صف "النتائج" + ترتيب ٣ حالات على الأعمدة + طي الفلاتر والجدول. الفلترة كلها server-side</li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span> <b>حارس نسخة الـ Worker بقى حد أدنى بدل تطابق حرفي</b> — الرقمين مستقلين بالتصميم، فالتطابق كان بيولّع تحذير كاذب دايم والموظف بيتعوّد يتجاهله. دلوقتي بيولّع بس لو الـ Worker أقدم من <code>MIN_WORKER_VERSION</code></li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span> <b>WORKER URL و ADMIN WORKER URL اتشالوا من الإعدادات</b> — بقوا ثوابت في الكود؛ الإعدادات فيها <code>WORKER SECRET</code> بس</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> <b>الهيدر وشريط التابات بيتقفلوا مع السكرول</b> (Freeze on Scroll) بعتبة <b>مقيسة</b> مش رقم ثابت، ومعاهم chip بيبدّل التابات وإنت نازل</li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span> صيغة التاريخ والوقت بقت موحّدة (📅 يوم/شهر/سنة 🕐 وقت)، والتاريخ والوقت عمودين منفصلين في السجل. وعرض الأداة بقى 1200px</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> رسالة <code>Invalid disposition quantity</code> بقت "مسترجَع قبل كده" بدل فشل، ودليل الاسترجاع في الإلغاء بقى بنافذة زمنية ضيقة بدل ٢ دقيقة قبل العملية</li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.2.0</span>
           <span class="cl-ver-date">23-08-2026</span>
         </div>
         <ul class="cl-items">
@@ -869,27 +1297,42 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 <script>
 'use strict';
 
-// ══ Version ═══════════════════════════════════════════════════════════════════
-// v3.2.0 — مصدر واحد لرقم نسخة الواجهة. الأداة بتقارنه بنسخة الـ Worker
-// (?action=get_config) وبتحذّر لو مختلفين — ده بيكشف حالتين صامتتين معروفتين:
-// نسخة اتعملها Save من غير Promote، أو Worker شبح اتنشر باسم تاني.
-const UI_VERSION = '3.2.0';
+// ══════════════════════════════════════════════════════════════
+// §CONFIG — النسخة + روابط الـ Workers + مفاتيح localStorage + طبقة الـ API
+// ══════════════════════════════════════════════════════════════
+
+// مصدر **واحد** لرقم نسخة الواجهة — بيتقرا منه زرار الهيدر وبادج الـ Changelog
+// ونص شاشة الدخول عن طريق renderVersionUI(). ممنوع كتابته hardcoded في أكتر
+// من مكان (٣ نصوص بتتزامن يدويًا = باج "الرقم متفرّق").
+const TOOL_VERSION = '3.3.0';
+
+// أقل نسخة Worker الواجهة دي بتشتغل معاها. v3.3.0 هي اللي ضافت
+// `get_logs_export` بعقد { cap, total, truncated } وفلاتر السجل كقوايم —
+// والواجهة دي معتمدة على الاتنين، فالحد الأدنى هو هي.
+// ⚠️ مالهاش أي علاقة بـ TOOL_VERSION — دي بتوصف الصفحة، ودي بتوصف أقل Worker
+// مقبول. متزامنهمش. وأي endpoint/حقل جديد الصفحة تعتمد عليه ⇒ ارفعها في نفس
+// التسليم، وإلا الحارس بيرجع لوضع "مفيش حماية".
+const MIN_WORKER_VERSION = '3.3.0';
 let   workerVersion = null;
 
-// ══ Config & LS Keys ══════════════════════════════════════════════════════════
-const LS_URL       = 'bosta_returned_scanner_worker_url';
-const LS_SECRET    = 'bosta_returned_scanner_worker_secret';
-const LS_ADMIN_URL = 'admin_worker_url';
+// ── روابط الـ Workers — constants مش حقول إعدادات (Standards #28) ──
+// الاتنين مش سر (الحماية في WORKER_SECRET + CORS allowlist)، واسم الـ Worker
+// ثابت من وقت الإنشاء — فتحويلهم لحقل إدخال كان عبء بلا فايدة أمنية.
+const WORKER_URL       = 'https://bosta-orders-returned-scanner.ecommoda-dev.workers.dev';
+const ADMIN_WORKER_URL = 'https://employees-admin-panel-worker.ecommoda-dev.workers.dev';  // ecommoda-constants §5b
+
+// السر هو الوحيد اللي لسه بيتخزّن من جهة المستخدم — الريبوهات Public
+const LS_SECRET = 'bosta_returned_scanner_worker_secret';
 
 function getConfig() {
   return {
-    url:      (localStorage.getItem(LS_URL)       || '').replace(/\/$/, ''),
-    secret:   localStorage.getItem(LS_SECRET)      || '',
-    adminUrl: (localStorage.getItem(LS_ADMIN_URL)  || '').replace(/\/$/, ''),
+    url:      WORKER_URL.replace(/\/$/, ''),
+    secret:   localStorage.getItem(LS_SECRET) || '',
+    adminUrl: ADMIN_WORKER_URL.replace(/\/$/, ''),
   };
 }
 
-// ══ Shopify order link + status badge colors ═══════════════════════════════════
+// ── Shopify order link + status badge colors ──
 const SHOP_DOMAIN = '6c7e1a-53.myshopify.com'; // ثابت — لينك رقم الأوردر
 
 function shopifyOrderUrl(orderId) {
@@ -923,20 +1366,54 @@ function statusBadgeClass(value) {
   return map[value] || 'badge-neutral';
 }
 
-// ══ Time ══════════════════════════════════════════════════════════════════════
+// ── §CONFIG::Time (datetime-format.md) ──
 function toCairo(iso) {
   return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000);
 }
+
+// الصيغة الموحّدة (datetime-format.md): 📅 DD/MM/YYYY 🕐 HH:MM صباحاً/مساءً
+// بفواصل `/` وبدون كلمة "الساعة" وبدون بادج ملوّن حواليها.
 function formatDateTime(iso) {
   if (!iso) return '—';
   const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
   let h = d.getUTCHours();
   const ampm = h >= 12 ? 'مساءً' : 'صباحاً';
   h = h % 12 || 12;
-  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth()+1)}-${d.getUTCFullYear()} ${pad(h)}:${pad(d.getUTCMinutes())} ${ampm}`;
+  return `📅 ${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)}/${d.getUTCFullYear()} 🕐 ${pad(h)}:${pad(d.getUTCMinutes())} ${ampm}`;
 }
 
-// ══ API Helpers ═══════════════════════════════════════════════════════════════
+// عمودي "التاريخ" و"الوقت" المنفصلين في الجدول — كل واحد بيتحسب من نفس الـ iso
+// الخام، مش parsing لنص معروض (النص هش وبينكسر لو الصيغة اتغيّرت).
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  return `📅 ${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)}/${d.getUTCFullYear()}`;
+}
+function formatTimeOnly(iso) {
+  if (!iso) return '—';
+  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  let h = d.getUTCHours();
+  const ampm = h >= 12 ? 'مساءً' : 'صباحاً';
+  h = h % 12 || 12;
+  return `🕐 ${pad(h)}:${pad(d.getUTCMinutes())} ${ampm}`;
+}
+
+// ⚠️ أعمدة XLSX — بدون إيموجي (بتكسر الفرز والفلترة جوّه الشيت)
+function formatDateForExport(iso) {
+  if (!iso) return '—';
+  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth()+1)}-${d.getUTCFullYear()}`;
+}
+function formatTimeForExport(iso) {
+  if (!iso) return '—';
+  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  let h = d.getUTCHours();
+  const ampm = h >= 12 ? 'مساءً' : 'صباحاً';
+  h = h % 12 || 12;
+  return `${pad(h)}:${pad(d.getUTCMinutes())} ${ampm}`;
+}
+
+// ── §CONFIG::API Helpers ──
 // v3.2.0 — رسائل الفشل بقت تفرّق بين "الـ Worker رد بخطأ" و"مقدرناش نوصله أصلاً"
 // (CORS / URL غلط / الـ Worker واقع). الحالتين كانوا بيديّوا "Failed to fetch" غامضة.
 async function apiRequest(url, opts) {
@@ -989,11 +1466,11 @@ const DIAG_LABELS = {
 };
 
 function diagLine(icon, color, title, detail) {
-  return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border-light);">
+  return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);">
     <span style="flex:0 0 auto;">${icon}</span>
     <div style="flex:1;">
       <div style="font-weight:600;color:${color};">${title}</div>
-      ${detail ? `<div style="color:var(--text-sub);font-size:11px;">${detail}</div>` : ''}
+      ${detail ? `<div style="color:var(--text-secondary);font-size:11px;">${detail}</div>` : ''}
     </div></div>`;
 }
 
@@ -1001,7 +1478,7 @@ async function runDiag() {
   const box = document.getElementById('diagResult');
   const btn = document.getElementById('diagBtn');
   btn.disabled = true;
-  box.innerHTML = `<div style="color:var(--text-sub);">جاري الفحص...</div>`;
+  box.innerHTML = `<div style="color:var(--text-secondary);">جاري الفحص...</div>`;
 
   try {
     const d = await apiGet('diag');
@@ -1038,8 +1515,8 @@ async function runDiag() {
 
     // أسماء المتغيرات — بتكشف المسافة المخفية في الاسم (سبب صامت معروف)
     if (c.env?.keys?.length) {
-      html += `<details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--text-sub);">أسماء المتغيرات وأطوال القيم (بدون أي قيمة)</summary>
-        <div style="font-family:var(--mono);font-size:11px;direction:ltr;text-align:left;padding:6px 0;">
+      html += `<details style="margin-top:8px;"><summary style="cursor:pointer;color:var(--text-secondary);">أسماء المتغيرات وأطوال القيم (بدون أي قيمة)</summary>
+        <div style="font-family:var(--font-mono);font-size:11px;direction:ltr;text-align:left;padding:6px 0;">
         ${c.env.keys.map(k => `${k.name} · len=${k.nameLen} · val=${k.valLen ?? '—'}`).join('<br>')}
         </div></details>`;
     }
@@ -1054,26 +1531,61 @@ async function runDiag() {
   }
 }
 
-// مقارنة نسخة الواجهة بنسخة الـ Worker عند التشغيل
+// ── §SHELL-JS::cmpVersion ──
+// مقارنة **رقمية** مش نصية — "10" أصغر من "9" لو اتقارنوا كنص.
+function cmpVersion(a, b) {
+  const pa = String(a).replace(/^v/, '').split('.').map(Number);
+  const pb = String(b).replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+// ── §SHELL-JS::checkWorkerVersion ──
+// السؤال الصح مش "النسختين متطابقتين؟" — الرقمين مستقلين بالتصميم واختلافهم
+// وضع طبيعي، فالتطابق الحرفي كان بيولّع تحذير كاذب دايم، والموظف بيتعوّد
+// يتجاهله، فلما يحصل rollback أو Promote ناقص فعلًا مفيش أي إشارة.
+// السؤال الصح: هل الـ Worker **جديد كفاية** للصفحة دي؟
 async function checkWorkerVersion() {
   try {
     const d = await apiGet('get_config');
     workerVersion = d.version || null;
-    const btn = document.getElementById('verMismatchBtn');
-    if (btn) btn.style.display = (workerVersion && workerVersion !== UI_VERSION) ? '' : 'none';
+    const stale = workerVersion && cmpVersion(workerVersion, MIN_WORKER_VERSION) < 0;
+    const btn = document.getElementById('verStaleBtn');
+    if (btn) btn.style.display = stale ? '' : 'none';
   } catch { /* الإعدادات ممكن تكون لسه مش مضبوطة — مش وقت إزعاج المستخدم */ }
 }
 
-function showVersionMismatch() {
-  showToast(`الواجهة v${UI_VERSION} والـ Worker v${workerVersion} — ارفع نسخة الـ Worker الصح أو اعمل Promote`, 'error');
+function showWorkerStale() {
+  showToast(
+    `الـ Worker نسخته ${workerVersion} والواجهة محتاجة ${MIN_WORKER_VERSION} على الأقل — ` +
+    `التحديث على ما يبدو ما نزلش. راجع Deployments و Promote في كلاودفلير.`,
+    'error', 7000
+  );
 }
 
-// ══ Modal Helpers ══════════════════════════════════════════════════════════════
+// ── §SHELL-JS::renderVersionUI ──
+// مصدر واحد لرقم النسخة في التلات أماكن (زرار الهيدر · بادج الـ Changelog ·
+// نص شاشة الدخول) — بدل ٣ نصوص بتتزامن يدويًا.
+function renderVersionUI() {
+  const btn = document.getElementById('verBtn');
+  if (btn) btn.textContent = `v${TOOL_VERSION} 📋`;
+  const badge = document.getElementById('clLatestBadge');
+  if (badge) badge.textContent = `v${TOOL_VERSION}`;
+  const login = document.getElementById('loginVersionText');
+  if (login) login.textContent = `v${TOOL_VERSION}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// §SHELL-JS — الإعدادات · النوافذ · التوست · التابات · Freeze on Scroll
+// ══════════════════════════════════════════════════════════════
+
+// ── §SHELL-JS::Modal Helpers ──
 function openSettings() {
-  const c = getConfig();
-  document.getElementById('cfgUrl').value      = c.url;
-  document.getElementById('cfgSecret').value   = c.secret;
-  document.getElementById('cfgAdminUrl').value = c.adminUrl;
+  // WORKER URL و ADMIN WORKER URL بقوا constants في §CONFIG — مش حقول إدخال
+  document.getElementById('cfgSecret').value = getConfig().secret;
   document.getElementById('settingsOverlay').classList.add('open');
 }
 function closeSettings()            { document.getElementById('settingsOverlay').classList.remove('open'); }
@@ -1084,15 +1596,12 @@ function openAbout()      { document.getElementById('aboutOverlay').classList.ad
 function closeAbout()     { document.getElementById('aboutOverlay').classList.remove('open'); }
 
 function saveSettings() {
-  const url    = document.getElementById('cfgUrl').value.trim();
   const secret = document.getElementById('cfgSecret').value.trim();
-  if (!url || !secret) { showToast('الرجاء إدخال الـ URL والـ Secret', 'error'); return; }
+  if (!secret) { showToast('الرجاء إدخال الـ Worker Secret', 'error'); return; }
 
-  localStorage.setItem(LS_URL,       url.replace(/\/$/, ''));
-  localStorage.setItem(LS_SECRET,    secret);
-  localStorage.setItem(LS_ADMIN_URL, document.getElementById('cfgAdminUrl').value.trim().replace(/\/$/, ''));
+  localStorage.setItem(LS_SECRET, secret);
 
-  updateLoginSettingsBtnState();
+  updateLoginSettingsBtn();
   updateSettingsBtn();
   closeSettings();
   showToast('تم حفظ الإعدادات ✓', 'success');
@@ -1107,14 +1616,14 @@ function updateSettingsBtn() {
   const btn = document.getElementById('settingsBtn');
   if (btn) btn.classList.toggle('settings-configured', isConfigured());
 }
-function updateLoginSettingsBtnState() {
+function updateLoginSettingsBtn() {
   const btn = document.getElementById('loginSettingsBtn');
   if (!btn) return;
   btn.classList.toggle('ready',   isConfigured());
   btn.classList.toggle('missing', !isConfigured());
 }
 
-// ══ Toast ══════════════════════════════════════════════════════════════════════
+// ── §SHELL-JS::Toast ──
 function showToast(msg, type = '') {
   const c = document.getElementById('toastContainer');
   const t = document.createElement('div');
@@ -1165,14 +1674,98 @@ function playBeep(type) {
   } catch {}
 }
 
-// ══ Main Tabs ══════════════════════════════════════════════════════════════════
+// ── §SHELL-JS::Main Tabs + Freeze on Scroll (tabs-and-modals.md § 1b) ──
+const TAB_IDS = ['scanner', 'log'];
+let currentTab = 'scanner';
+
 function switchMainTab(tab) {
+  currentTab = tab;
   document.getElementById('tabBtnScanner').classList.toggle('active', tab === 'scanner');
   document.getElementById('tabBtnLog').classList.toggle('active', tab === 'log');
   document.getElementById('tab-scanner').classList.toggle('active', tab === 'scanner');
   document.getElementById('tab-log').classList.toggle('active', tab === 'log');
+  updateTabChip();
+  closeTabChipMenu();
   if (tab === 'log') fetchLog();
 }
+
+// ── Chip التاب الحالي — بديل شريط التابات المقفول وقت الـ Sticky ──
+function tabBtnEl(id) { return document.getElementById(id === 'scanner' ? 'tabBtnScanner' : 'tabBtnLog'); }
+
+function updateTabChip() {
+  document.getElementById('activeTabChipLabel').textContent = tabBtnEl(currentTab).textContent.trim();
+  document.querySelectorAll('#tabChipMenu .tab-chip-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === currentTab);
+  });
+}
+function buildTabChipMenu() {
+  document.getElementById('tabChipMenu').innerHTML = TAB_IDS.map(id =>
+    `<div class="tab-chip-item ${id === currentTab ? 'active' : ''}" data-tab="${id}"
+      onclick="event.stopPropagation(); switchMainTab('${id}');">${tabBtnEl(id).textContent.trim()}</div>`
+  ).join('');
+}
+function toggleTabChipMenu(e) {
+  e.stopPropagation();
+  const chip = document.getElementById('activeTabChip'), menu = document.getElementById('tabChipMenu');
+  const willOpen = !menu.classList.contains('open');
+  menu.classList.toggle('open', willOpen);
+  chip.classList.toggle('open', willOpen);
+}
+function closeTabChipMenu() {
+  document.getElementById('tabChipMenu')?.classList.remove('open');
+  document.getElementById('activeTabChip')?.classList.remove('open');
+}
+document.addEventListener('click', (e) => {
+  const chip = document.getElementById('activeTabChip');
+  if (chip && !chip.contains(e.target)) closeTabChipMenu();
+});
+
+// ── Sticky/compact toggle — Hysteresis **مقيسة** + rAF throttle ──
+// ⚠️ ممنوع رقم ثابت: قفل الهيدر بيقلّل ارتفاعه فوق منطقة العرض، والمتصفح
+// (scroll anchoring) بيطرح الفرق من `scrollY` نفسه — فالفعل بيغذّي شرطه.
+// لو الباند أضيق من الارتداد، الهيدر بيترفرف عند نقطة القفل. الفرق ده بيختلف
+// من أداة لأداة حسب الهيدر والوصف وشريط التابات، فلازم **يتقاس**.
+const stickyWrap = document.getElementById('stickyWrap');
+const STICK_OFF  = 12;
+let STICK_ON = 140;                 // قيمة مبدئية آمنة — بتتحسب في measureSticky()
+let stickyDelta = 0, stickyW = 0, stickyRafPending = false;
+
+function measureSticky() {
+  const wasStuck = stickyWrap.classList.contains('stuck');
+  const nodes = [stickyWrap, ...stickyWrap.querySelectorAll('*')];
+  const prev  = nodes.map(n => n.style.transition);
+  nodes.forEach(n => n.style.transition = 'none');
+  stickyWrap.classList.remove('stuck');  const open = stickyWrap.offsetHeight;
+  stickyWrap.classList.add('stuck');     const shut = stickyWrap.offsetHeight;
+  stickyWrap.classList.toggle('stuck', wasStuck);
+  stickyWrap.offsetHeight;                                   // reflow قبل رجوع الترانزيشن
+  nodes.forEach((n, i) => n.style.transition = prev[i]);
+  stickyDelta = Math.max(0, open - shut);
+  STICK_ON = Math.max(40, stickyDelta + STICK_OFF + 24);     // الباند أوسع من الارتداد
+  stickyW = window.innerWidth;
+}
+
+function onPageScroll() {
+  if (stickyRafPending) return;
+  stickyRafPending = true;
+  requestAnimationFrame(() => {
+    stickyRafPending = false;
+    const y = window.scrollY;
+    const isStuck = stickyWrap.classList.contains('stuck');
+    if (!isStuck && y > STICK_ON)      stickyWrap.classList.add('stuck');
+    else if (isStuck && y < STICK_OFF) stickyWrap.classList.remove('stuck');
+  });
+}
+window.addEventListener('scroll', onPageScroll, { passive: true });
+
+// ⚠️ إعادة القياس على تغيّر **العرض** بس + debounce — ارتفاع الشاشة بيتغيّر
+// عشرات المرات على الموبايل (شريط عنوان المتصفح)، والقياس بيلمس الكلاس.
+let stickyResizeTimer;
+window.addEventListener('resize', () => {
+  if (window.innerWidth === stickyW) return;
+  clearTimeout(stickyResizeTimer);
+  stickyResizeTimer = setTimeout(measureSticky, 150);
+});
 
 // ══════════════════════════════════════════════════════════════
 // §AUTH-JS — login screen (UI Standard v2 — full state machine)
@@ -1188,7 +1781,7 @@ async function loadEmployeesList() {
   const sel    = document.getElementById('loginSelect');
   const status = document.getElementById('loginStatus');
   clearLoginAlert();
-  sel.innerHTML = '<option value="">— اختر —</option>';
+  sel.innerHTML = '<option value="">اختر اسمك للمتابعة</option>';
   sel.disabled  = true;
 
   if (!isConfigured()) {
@@ -1213,16 +1806,12 @@ async function loadEmployeesList() {
 
     sel.disabled       = false;
     status.className   = employees.length ? 'login-status info' : 'login-status warn';
-    status.textContent = employees.length ? 'اختر الموظف للمتابعة.' : 'لا يوجد موظفون نشطون.';
+    // نجح وفيه موظفين → رسالة فاضية؛ الإرشاد بقى في placeholder القائمة (Standards #34)
+    status.textContent = employees.length ? '' : 'لا يوجد موظفون نشطون.';
 
-    // تاب السجل بيستخدم نفس القائمة
-    const logSel = document.getElementById('logFilterEmployee');
-    logSel.innerHTML = '<option value="">كل الموظفين</option>';
-    employees.forEach(e => {
-      const opt = document.createElement('option');
-      opt.value = e.username; opt.textContent = e.display_name;
-      logSel.appendChild(opt);
-    });
+    // فلتر الموظف في تاب السجل — multi-select من نفس المصدر، مش قائمة ثابتة
+    msState.emp.items = employees.map(e => ({ value: e.username, label: e.display_name }));
+    msRenderList('emp');
   } catch (err) {
     status.className   = 'login-status error';
     status.textContent = 'تعذّر تحميل قائمة الموظفين.';
@@ -1278,7 +1867,8 @@ function renderLoginMode(mode) {
 
   const sub = document.getElementById('loginSub');
   if (mode === 'employee') {
-    sub.textContent = 'اختر اسمك للمتابعة'; pinLabel.textContent = 'أدخل الـ PIN';
+    sub.textContent = '';   // الإرشاد بقى في placeholder القائمة (Standards #34)
+    pinLabel.textContent = 'أدخل الـ PIN';
     primary.textContent = 'دخول'; primary.disabled = true; return;
   }
   if (mode === 'existing') {
@@ -1460,7 +2050,9 @@ function doLogout() {
   document.getElementById('loginOverlay').classList.remove('hidden');
 }
 
-// ══ Scanner Gun Input ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// §SCAN — سكانر الجن (النمط الإلزامي: القراءة والمسح جوّه handleScan)
+// ══════════════════════════════════════════════════════════════
 // Pattern: listener sets timeout only; handleScan reads + clears value
 let scanTimer;
 const scanInputEl = document.getElementById('scanInput');
@@ -1485,7 +2077,11 @@ function addManual() {
   if (val) addTrackingNumber(val);
 }
 
-// ══ State ══════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// §TOOL-JS — منطق الأداة (اللائحة · lookup · التحديث · التصدير)
+// ══════════════════════════════════════════════════════════════
+
+// ─── §TOOL-JS::state ───
 let scannedNums = [];
 let resultsData = [];
 
@@ -1539,7 +2135,7 @@ function renderScanList() {
     scannedNums.map((n, i) => `
       <div class="scan-chip">
         <div style="display:flex;align-items:center;gap:8px;">
-          <span style="color:var(--text-muted);font-size:12px;font-family:var(--mono);">${i + 1}</span>
+          <span style="color:var(--text-muted);font-size:12px;font-family:var(--font-mono);">${i + 1}</span>
           <span class="scan-chip-num">${n}</span>
         </div>
         <button class="scan-chip-del" onclick="removeScanned('${n}')" title="حذف">×</button>
@@ -1547,7 +2143,7 @@ function renderScanList() {
   }</div>`;
 }
 
-// ══ Lookup ═════════════════════════════════════════════════════════════════════
+// ─── §TOOL-JS::lookup ───
 async function startLookup() {
   const cfg = getConfig();
   if (!cfg.url || !cfg.secret) { showToast('يرجى ضبط الإعدادات أولاً', 'error'); openSettings(); return; }
@@ -1591,7 +2187,7 @@ async function startLookup() {
   }
 }
 
-// ══ Results Table ══════════════════════════════════════════════════════════════
+// ─── §TOOL-JS::renderResults ───
 const STATE_MAP_COLORS = {
   45: 'badge-success', 46: 'badge-warn',
   47: 'badge-danger', 48: 'badge-danger', 49: 'badge-danger',
@@ -1606,10 +2202,10 @@ function renderLookupAlert(bostaErrors, shopifyError) {
   if (shopifyError)       msgs.push(`<b>تعذّر الاتصال بشوبيفاي:</b> ${shopifyError}`);
   if (!msgs.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = '';
-  el.innerHTML = `<div style="background:var(--red-bg);border:1.5px solid var(--red-b);color:var(--red);
+  el.innerHTML = `<div style="background:var(--red-light);border:1.5px solid var(--red-border);color:var(--red);
     border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;line-height:1.7;">
     ⚠️ ${msgs.join('<br>')}<br>
-    <span style="color:var(--text-sub);">الأرقام المتأثرة اتعلّمت بـ"تعذّر الاستعلام" — دي <u>مش</u> معناها إن الشحنة مش موجودة.</span>
+    <span style="color:var(--text-secondary);">الأرقام المتأثرة اتعلّمت بـ"تعذّر الاستعلام" — دي <u>مش</u> معناها إن الشحنة مش موجودة.</span>
     </div>`;
 }
 
@@ -1623,7 +2219,7 @@ function renderResults() {
   document.getElementById('resultsSummaryPills').innerHTML = `
     <div class="pill"><span class="pill-val">${resultsData.length}</span><span class="pill-lbl">إجمالي</span></div>
     <div class="pill success"><span class="pill-val">${valid}</span><span class="pill-lbl">متوافق</span></div>
-    ${rejected > 0  ? `<div class="pill" style="border-color:var(--amber-b);"><span class="pill-val" style="color:var(--amber);">${rejected}</span><span class="pill-lbl">مرفوض</span></div>` : ''}
+    ${rejected > 0  ? `<div class="pill" style="border-color:var(--amber-border);"><span class="pill-val" style="color:var(--amber);">${rejected}</span><span class="pill-lbl">مرفوض</span></div>` : ''}
     ${failed > 0    ? `<div class="pill danger"><span class="pill-val">${failed}</span><span class="pill-lbl">تعذّر الاستعلام</span></div>` : ''}
     ${notFound > 0 ? `<div class="pill danger"><span class="pill-val">${notFound}</span><span class="pill-lbl">غير موجود ببوسطة</span></div>` : ''}
   `;
@@ -1685,7 +2281,7 @@ function getTargetCell(r) {
       ? '+ إلغاء الأوردر على شوبيفاي'
       : '+ استرجاع المخزون';
     return `<span class="badge ${statusBadgeClass('Returned')}">${label}</span>`
-      + `<br><span class="reject-reason" style="color:var(--text-sub);">${sideEffect}</span>`;
+      + `<br><span class="reject-reason" style="color:var(--text-secondary);">${sideEffect}</span>`;
   }
   return `<span class="badge badge-danger">مرفوض</span><br><span class="reject-reason">${r.rejectReason || ''}</span>`;
 }
@@ -1697,7 +2293,7 @@ function getShopifyCell(status, failReason, detail) {
   if (!status) return `<span class="badge badge-neutral">—</span>`;
 
   const detailLine = detail
-    ? `<br><span class="reject-reason" style="color:var(--text-sub);">${detail}</span>`
+    ? `<br><span class="reject-reason" style="color:var(--text-secondary);">${detail}</span>`
     : '';
 
   if (status === 'success') return `<span class="badge badge-success">✓ تم</span>${detailLine}`;
@@ -1748,7 +2344,7 @@ function updateUpdateBtn() {
   btn.textContent = n > 0 ? `↩ تحديث شوبيفاي (${n})` : '↩ تحديث شوبيفاي';
 }
 
-// ══ Shopify Update ═════════════════════════════════════════════════════════════
+// ─── §TOOL-JS::startUpdate ───
 async function startUpdate() {
   if (!currentEmployee) { showToast('يرجى تسجيل الدخول أولاً', 'error'); return; }
   const toUpdate = resultsData.filter(r => r.found && r.valid && r.selected);
@@ -1775,14 +2371,17 @@ async function startUpdate() {
   try {
     const data = await apiPost('update', { items, employee: currentEmployee.username });
 
-    const resultMap = {};
-    for (const r of data.results) resultMap[r.orderName.replace(/^#/, '')] = r;
+    // ⚠️ v3.3.0 — المطابقة بالترتيب مش باسم الأوردر. الـ Worker بيرجّع نتيجة
+    // **لكل عنصر** بنفس الترتيب اللي اتبعت، ورقمين تتبع ممكن يرجعوا لنفس
+    // الأوردر (شحنة RTO + شحنة مرتجع) — فماب باسم الأوردر كان بيخلي الصفّين
+    // ياخدوا نتيجة واحدة (الأخيرة)، وهي غالبًا رسالة "اتخطّينا التكرار".
+    const resByRowIdx = new Map();
+    toUpdate.forEach((row, i) => { if (data.results[i]) resByRowIdx.set(row, data.results[i]); });
 
     let done = 0;
     for (let i = 0; i < resultsData.length; i++) {
       const r   = resultsData[i];
-      const key = String(r.businessRef || '').replace(/^#/, '');
-      const res = resultMap[key];
+      const res = resByRowIdx.get(r);
       if (res) {
         // v3.2.0 — الحالة جاية من السيرفر كـ success | warning | error
         r.shopifyStatus = res.status || (res.success ? 'success' : 'error');
@@ -1819,7 +2418,7 @@ async function startUpdate() {
   }
 }
 
-// ══ Export Results XLSX ════════════════════════════════════════════════════════
+// ─── §TOOL-JS::exportResultsXLSX ───
 async function exportResultsXLSX() {
   if (!resultsData.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
   const wb  = new ExcelJS.Workbook();
@@ -1869,98 +2468,421 @@ async function exportResultsXLSX() {
   showToast('تم التصدير', 'success');
 }
 
-// ══ Log Tab ════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// §LOG-JS — تاب السجل: فلاتر multi-select + مدى تاريخ + ترتيب + تصدير
+// ══════════════════════════════════════════════════════════════
+// كل الفلترة server-side (`data-table-standard` + Log Filter Model v2).
+// الفلترة في المتصفح ممنوعة هنا: "النتائج" كانت هتعدّ الصفحة مش القاعدة،
+// والصفحة التانية كانت هتيجي بلا فلترة، والتصدير كان هينزّل غير المفلتر —
+// كله من غير أي رسالة.
+
 const LOG_PAGE_SIZE = 100;
 let logCurrentPage  = 1;
 let logTotalCount   = 0;
-let logFilterTimer;
+let logSearchTimer  = null;
 
-function onLogFilter() {
-  clearTimeout(logFilterTimer);
-  logFilterTimer = setTimeout(() => { logCurrentPage = 1; fetchLog(); }, 400);
+// ─── §LOG-JS::msState — فلاتر الاختيار المتعدد ───
+const msState = {
+  emp:     { items: [], selected: new Set(), search: '' },
+  result:  { items: [
+      { value: 'success', label: '✓ تم' },
+      { value: 'warning', label: '⚠ جزئي' },
+      { value: 'error',   label: '✗ فشل' },
+    ], selected: new Set(), search: '' },
+  machine: { items: [
+      { value: 'S1', label: 'S1 — مسار RTO' },
+      { value: 'S2', label: '[S-2] — مرتجع بعد التسليم' },
+    ], selected: new Set(), search: '' },
+};
+const filterLabels = { emp: 'الموظف', result: 'النتيجة', machine: 'الماكينة' };
+
+function msRenderList(key) {
+  const st = msState[key];
+  const listEl = document.getElementById(`msList-${key}`);
+  const q = st.search.trim().toLowerCase();
+  const visible = q ? st.items.filter(it => it.label.toLowerCase().includes(q)) : st.items;
+
+  listEl.innerHTML = !visible.length
+    ? '<div class="ms-empty">لا توجد نتائج مطابقة</div>'
+    : visible.map(it => {
+        const checked = st.selected.has(it.value);
+        return `<div class="ms-item ${checked ? 'checked' : ''}" onclick="msToggleItem('${key}','${it.value}')">
+          <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation(); msToggleItem('${key}','${it.value}')">
+          <span class="ms-item-label">${it.label}</span>
+        </div>`;
+      }).join('');
+
+  const allVisibleChecked = visible.length > 0 && visible.every(it => st.selected.has(it.value));
+  document.getElementById(`msSelectAll-${key}`).checked = allVisibleChecked;
+  msUpdateButtonLabel(key);
+  document.getElementById(`msFtrCount-${key}`).textContent = `${st.selected.size} مختار`;
+}
+
+function msUpdateButtonLabel(key) {
+  const st  = msState[key];
+  const btn = document.getElementById(`msBtn-${key}`);
+  const lbl = document.getElementById(`msBtnLabel-${key}`);
+  const n   = st.selected.size;
+  btn.classList.toggle('has-selection', n > 0);
+  if (n === 0)      lbl.textContent = btn.dataset.defaultLabel || 'الكل';
+  else if (n === 1) lbl.textContent = (st.items.find(i => i.value === [...st.selected][0]) || {}).label || [...st.selected][0];
+  else              lbl.innerHTML   = `${n} محددين <span class="ms-count">${n}</span>`;
+}
+
+function msToggle(key) {
+  const menu = document.getElementById(`msMenu-${key}`), btn = document.getElementById(`msBtn-${key}`);
+  const willOpen = !menu.classList.contains('open');
+  Object.keys(msState).forEach(k => {
+    document.getElementById(`msMenu-${k}`).classList.remove('open');
+    document.getElementById(`msBtn-${k}`).classList.remove('open');
+  });
+  if (willOpen) { menu.classList.add('open'); btn.classList.add('open'); }
+}
+
+// الاختيار **مش** بيقفل القائمة — المستخدم بيختار كذا قيمة ورا بعض
+function msToggleItem(key, value) {
+  const st = msState[key];
+  st.selected.has(value) ? st.selected.delete(value) : st.selected.add(value);
+  msRenderList(key); renderChips(); onLogFilterChange();
+}
+
+function msToggleSelectAll(key, forceState) {
+  const st = msState[key];
+  const visible = st.items;
+  const allChecked = visible.length > 0 && visible.every(it => st.selected.has(it.value));
+  const shouldCheck = forceState !== undefined ? forceState : !allChecked;
+  visible.forEach(it => shouldCheck ? st.selected.add(it.value) : st.selected.delete(it.value));
+  msRenderList(key); renderChips(); onLogFilterChange();
+}
+
+function msClear(key) {
+  msState[key].selected.clear();
+  msRenderList(key); renderChips(); onLogFilterChange();
+}
+
+// ⚠️ الحارس الأول إلزامي: `msRenderList` بتعيد بناء الـ innerHTML جوّه الـ
+// handler، فالعنصر المضغوط بيتشال من الـ DOM قبل ما الحدث يوصل هنا،
+// و`contains()` على عنصر detached بترجّع false → الكود يفتكر الضغطة برّه
+// ويقفل القائمة بعد **أول** اختيار. (multi-select-filter.md § 8)
+document.addEventListener('click', (e) => {
+  if (!document.contains(e.target)) return;
+  Object.keys(msState).forEach(k => {
+    const wrap = document.getElementById(`msWrap-${k}`);
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById(`msMenu-${k}`).classList.remove('open');
+      document.getElementById(`msBtn-${k}`).classList.remove('open');
+    }
+  });
+});
+
+// ─── §LOG-JS::renderChips — سطر لكل فلتر، والاسم مرة واحدة في أوله ───
+function renderChips() {
+  Object.keys(msState).forEach(key => {
+    const row = document.getElementById(`chipsRow-${key}`);
+    if (!row) return;
+    const label = filterLabels[key] || key;
+    const chips = [...msState[key].selected].map(val => {
+      const item = msState[key].items.find(it => it.value === val);
+      return `<span class="ms-chip">${item ? item.label : val}<button onclick="msToggleItem('${key}','${val}')">✕</button></span>`;
+    }).join('');
+    row.innerHTML = chips ? `<span class="chips-label">${label}:</span>${chips}` : '';
+  });
+}
+
+// ─── §LOG-JS::فلتر الفترة (date-range-filter.md) — بدون افتراضي ───
+const RANGE_PRESET_LABELS = {
+  today: 'اليوم', yesterday: 'أمس', last3: 'آخر 3 أيام', last7: 'آخر 7 أيام',
+  last30: 'آخر 30 يوم', last90: 'آخر 90 يوم', thisMonth: 'الشهر الحالي',
+  lastMonth: 'الشهر السابق', thisQuarter: 'الربع الحالي',
+  thisYear: 'العام الحالي', lastYear: 'العام السابق',
+};
+let activeRangePreset = '';
+let dateFrom = null, dateTo = null;
+// ⚠️ متغيّر منفصل — مش مجرد `!!dateFrom`: من غيره أيقونة الفلتر وزرار المسح
+// بيفضلوا في نفس الحالة للأبد (data-table-standard § 3)
+let dateFilterActive = false;
+let rangeDebounce = null;
+
+function cairoNow()          { return new Date(Date.now() + 3 * 60 * 60 * 1000); }
+function cairoDateStr(d)     { const p = n => String(n).padStart(2, '0');
+                               return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`; }
+function addDays(dateStr, n) { const d = new Date(`${dateStr}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return cairoDateStr(d); }
+
+function toggleRangePresetMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('rangePresetMenu'), btn = document.getElementById('rangePresetBtn');
+  const isOpen = menu.classList.contains('open');
+  menu.classList.toggle('open', !isOpen); btn.classList.toggle('open', !isOpen);
+}
+// ⚠️ القائمة دي **مش** محتاجة حارس document.contains — مابتعملش re-render،
+// والقفل بعد الاختيار سلوك مقصود عندها (multi-select-filter.md § 8، الاستثناء)
+document.addEventListener('click', () => {
+  document.getElementById('rangePresetMenu')?.classList.remove('open');
+  document.getElementById('rangePresetBtn')?.classList.remove('open');
+});
+
+function computePresetRange(preset) {
+  const now = cairoNow(), today = cairoDateStr(now);
+  switch (preset) {
+    case 'today':      return { from: today, to: today };
+    case 'yesterday':  { const y = addDays(today, -1); return { from: y, to: y }; }
+    case 'last3':      return { from: addDays(today, -2),  to: today };
+    case 'last7':      return { from: addDays(today, -6),  to: today };
+    case 'last30':     return { from: addDays(today, -29), to: today };
+    case 'last90':     return { from: addDays(today, -89), to: today };
+    case 'thisMonth':  return { from: `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}-01`, to: today };
+    case 'lastMonth': {
+      const firstThis = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const lastPrev  = new Date(firstThis); lastPrev.setUTCDate(0);
+      const firstPrev = new Date(Date.UTC(lastPrev.getUTCFullYear(), lastPrev.getUTCMonth(), 1));
+      return { from: cairoDateStr(firstPrev), to: cairoDateStr(lastPrev) };
+    }
+    case 'thisQuarter': {
+      const q = Math.floor(now.getUTCMonth() / 3);
+      return { from: cairoDateStr(new Date(Date.UTC(now.getUTCFullYear(), q * 3, 1))), to: today };
+    }
+    case 'thisYear':   return { from: `${now.getUTCFullYear()}-01-01`, to: today };
+    case 'lastYear': { const y = now.getUTCFullYear() - 1; return { from: `${y}-01-01`, to: `${y}-12-31` }; }
+    default: return null;
+  }
+}
+
+function applyRangePreset(preset) {
+  document.getElementById('rangePresetMenu').classList.remove('open');
+  document.getElementById('rangePresetBtn').classList.remove('open');
+  const range = computePresetRange(preset);
+  if (!range) return;
+  activeRangePreset = preset;
+  dateFrom = range.from; dateTo = range.to; dateFilterActive = true;
+  document.getElementById('rangeDateFrom').value = range.from;
+  document.getElementById('rangeDateTo').value   = range.to;
+  document.querySelectorAll('.range-preset-item').forEach(el => el.classList.toggle('active', el.dataset.preset === preset));
+  document.getElementById('rangePresetLabel').textContent = `⚡ ${RANGE_PRESET_LABELS[preset]}`;
+  document.getElementById('rangePresetBtn').classList.add('has-preset');
+  onLogFilterChange();
+}
+
+// الحالة المحايدة الوحيدة — بيستخدمها "مسح الاختيار" و"مسح كل الفلاتر"
+function resetDateFilter() {
+  activeRangePreset = ''; dateFrom = null; dateTo = null; dateFilterActive = false;
+  document.getElementById('rangeDateFrom').value = '';
+  document.getElementById('rangeDateTo').value   = '';
+  document.getElementById('rangePresetLabel').textContent = '⚡ اختار فترة';
+  document.getElementById('rangePresetBtn').classList.remove('has-preset');
+  document.querySelectorAll('.range-preset-item').forEach(el => el.classList.remove('active'));
+}
+function clearRangePreset() {
+  document.getElementById('rangePresetMenu').classList.remove('open');
+  resetDateFilter(); onLogFilterChange();
+}
+
+function onRangeDateChange() {
+  activeRangePreset = '';
+  document.querySelectorAll('.range-preset-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('rangePresetLabel').textContent = '⚡ اختار فترة';
+  document.getElementById('rangePresetBtn').classList.remove('has-preset');
+
+  const f = document.getElementById('rangeDateFrom').value;
+  const t = document.getElementById('rangeDateTo').value;
+  if (!f || !t || f > t) return;
+  clearTimeout(rangeDebounce);
+  rangeDebounce = setTimeout(() => {
+    dateFrom = f; dateTo = t; dateFilterActive = true;
+    onLogFilterChange();
+  }, 400);
+}
+
+// ─── §LOG-JS::anyFilterActive ───
+// ⚠️ فحص truthy (`!!`) مش مقارنة صريحة بـ null — الخاصية اللي مش موجودة أصلاً
+// قيمتها `undefined`، و`undefined !== null` بترجع true فالشرط بيتحقق دايمًا
+// والأيقونة/الزرار مابيتغيّروش طول عمر الصفحة (data-table-standard § 3).
+function anyFilterActive() {
+  const msActive = Object.keys(msState).some(k => msState[k].selected.size > 0);
+  const search   = document.getElementById('logSearch').value.trim();
+  return msActive || !!search || dateFilterActive;
+}
+function updateFilterIconState() {
+  const active = anyFilterActive();
+  document.getElementById('fltIcon').classList.toggle('active', active);
+  document.getElementById('clearAllBtn').classList.toggle('inactive', !active);
+}
+
+function clearAllFilters() {
+  Object.keys(msState).forEach(k => { msState[k].selected.clear(); msRenderList(k); });
+  document.getElementById('logSearch').value = '';
+  toggleSearchActiveState(document.getElementById('logSearch'));
+  resetDateFilter();
+  renderChips();
+  onLogFilterChange();
+}
+
+function toggleFilters() {
+  const body = document.getElementById('fltBody');
+  const icon = document.getElementById('fltToggleIcon');
+  const collapsed = body.classList.toggle('collapsed');
+  icon.classList.toggle('open', !collapsed);
+}
+function toggleTable() {
+  const wrap = document.getElementById('tblBodyWrap');
+  const icon = document.getElementById('tblToggleIcon');
+  const collapsed = wrap.classList.toggle('collapsed');
+  icon.classList.toggle('open', !collapsed);
+}
+
+function onLogSearchInput(el) {
+  toggleSearchActiveState(el);
+  clearTimeout(logSearchTimer);
+  logSearchTimer = setTimeout(() => { logCurrentPage = 1; clearExportWarn(); fetchLog(); }, 400);
+}
+function onLogFilterChange() { logCurrentPage = 1; clearExportWarn(); fetchLog(); }
+
+// ─── §LOG-JS::logParams — مصدر واحد للفلاتر في التلات نداءات ───
+// endpoint بيفلتر غير اللي جنبه = تصدير مش مطابق للمعروض.
+function logParams() {
+  const p = {};
+  const emps     = [...msState.emp.selected];
+  const results  = [...msState.result.selected];
+  const machines = [...msState.machine.selected];
+  const search   = document.getElementById('logSearch').value.trim();
+  if (emps.length)     p.employees = emps.join(',');
+  if (results.length)  p.results   = results.join(',');
+  if (machines.length) p.machines  = machines.join(',');
+  if (search)          p.search    = search;
+  // ⚠️ dateFrom/dateTo بيتقارنوا في الـ Worker بـ `timestamp` المخزّن (**UTC**)
+  // والعرض هنا بتوقيت القاهرة (UTC+3) — فرق التلات ساعات ممكن يحط عملية بعد
+  // ٩ مساءً في يوم UTC اللي بعده. مقبول لفلتر بالأيام، بس موثّق.
+  if (dateFilterActive && dateFrom) p.dateFrom = dateFrom;
+  if (dateFilterActive && dateTo)   p.dateTo   = dateTo;
+  return p;
+}
+
+// ─── §LOG-JS::الترتيب — مستقل تمامًا عن الفلاتر ───
+const sortConfig = {
+  date: { type: 'date' }, time: { type: 'date' }, emp: { type: 'string' },
+  order: { type: 'string' }, machine: { type: 'string' },
+  result: { type: 'string' }, tn: { type: 'string' },
+};
+let sortState = { key: null, dir: null };
+let logRows   = [];   // صفوف الصفحة الحالية بعد التطبيع
+
+function toggleSort(key) {
+  if (sortState.key !== key)          { sortState.key = key; sortState.dir = 'asc'; }
+  else if (sortState.dir === 'asc')   { sortState.dir = 'desc'; }
+  else                                { sortState.key = null; sortState.dir = null; }
+  updateSortHeaderUI();
+  renderLogTable();
+}
+function updateSortHeaderUI() {
+  document.querySelectorAll('.sort-icon').forEach(el => {
+    const isActive = sortState.key === el.dataset.sortKey;
+    el.textContent = isActive ? (sortState.dir === 'asc' ? '▲' : '▼') : '';
+    el.classList.toggle('active', isActive);
+  });
+  document.querySelectorAll('.sortable-th').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.sortKey === sortState.key);
+  });
+}
+function applySort(rows) {
+  if (!sortState.key) return rows;                 // بلا ترتيب = ترتيب المصدر
+  const cfg = sortConfig[sortState.key];
+  const dir = sortState.dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {                // نسخة جديدة — مش in-place
+    const av = a[sortState.key], bv = b[sortState.key];
+    if (cfg.type === 'date')   return (av.getTime() - bv.getTime()) * dir;
+    return String(av ?? '').localeCompare(String(bv ?? '')) * dir;
+  });
 }
 
 async function fetchLog() {
-  const employee = document.getElementById('logFilterEmployee').value || null;
-  const search   = document.getElementById('logSearch').value.trim()  || null;
-  const offset   = (logCurrentPage - 1) * LOG_PAGE_SIZE;
-
-  const params      = { limit: LOG_PAGE_SIZE, offset };
-  const countParams = {};
-  if (employee) { params.employee = employee; countParams.employee = employee; }
-  if (search)   { params.search   = search;   countParams.search   = search;   }
+  const offset = (logCurrentPage - 1) * LOG_PAGE_SIZE;
+  const base   = logParams();
+  updateFilterIconState();
 
   document.getElementById('logBody').innerHTML =
-    `<tr><td colspan="7"><div class="empty-state"><div class="spinner spinner-dark" style="margin:0 auto 8px"></div><div>جاري التحميل...</div></div></td></tr>`;
+    `<tr><td colspan="8"><div class="empty-state"><div class="spinner spinner-dark" style="margin:0 auto 8px"></div><div>جاري التحميل...</div></div></td></tr>`;
 
   try {
     const [pageData, countData] = await Promise.all([
-      apiGet('get_logs', params),
-      apiGet('get_logs_count', countParams),
+      apiGet('get_logs',       { ...base, limit: LOG_PAGE_SIZE, offset }),
+      apiGet('get_logs_count', base),
     ]);
     logTotalCount = countData.total || 0;
-    renderLogTable(pageData.entries || []);
+    logRows = (pageData.entries || []).map(normalizeLogRow);
+    renderLogTable();
     renderPagination();
   } catch (err) {
+    logRows = [];
     document.getElementById('logBody').innerHTML =
-      `<tr><td colspan="7"><div class="empty-state"><div class="icon">❌</div><div>فشل التحميل: ${err.message}</div></div></td></tr>`;
+      `<tr><td colspan="8"><div class="empty-state"><div class="icon">❌</div><div>فشل التحميل: ${err.message}</div></div></td></tr>`;
+    document.getElementById('filteredCount').textContent = '—';
   }
 }
 
-function renderLogTable(entries) {
+function normalizeLogRow(e) {
+  const extra = e.extra ? (typeof e.extra === 'string' ? JSON.parse(e.extra) : e.extra) : {};
+  const d = new Date(e.timestamp);
+  // السجلات القديمة (قبل v3.0.0) كانت type='returned' وبتخزّن التاج في notes
+  const isLegacy = e.type === 'returned';
+  return {
+    raw: e, extra, isLegacy,
+    date: d, time: d,                                 // نفس المرجع — عمودين عرض من نفس الـ timestamp
+    emp: e.employee || '', order: e.order_name || '',
+    machine: extra.machine || '', result: extra.result || '',
+    tn: extra.trackingNumber || '',
+  };
+}
+
+function renderLogTable() {
   const tbody = document.getElementById('logBody');
-  if (!entries.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل</div></div></td></tr>`;
+  document.getElementById('filteredCount').textContent = logTotalCount.toLocaleString('en-US');
+
+  if (!logRows.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">📋</div><div>لا يوجد سجل</div></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = entries.map(e => {
-    const extra = e.extra ? (typeof e.extra === 'string' ? JSON.parse(e.extra) : e.extra) : {};
-    const tn    = extra.trackingNumber || '—';
 
-    // السجلات القديمة (قبل v3.0.0) كانت type='returned' وبتخزّن التاج في notes
-    const isLegacy = e.type === 'returned';
-    const machine   = extra.machine || null;
+  tbody.innerHTML = applySort(logRows).map(row => {
+    const e = row.raw, extra = row.extra;
 
-    const machineBadge = isLegacy
+    const machineBadge = row.isLegacy
       ? `<span class="badge badge-neutral" title="سجل قديم — نظام التاجات قبل v3.0.0">🏷️ تاج (قديم)</span>`
-      : machine === 'S1'
-        ? `<span class="badge badge-blue" style="font-family:var(--mono);">S1</span>`
-        : machine === 'S2'
-          ? `<span class="badge badge-warn" style="font-family:var(--mono);">[S-2]</span>`
+      : row.machine === 'S1'
+        ? `<span class="badge badge-blue" style="font-family:var(--font-mono);">S1</span>`
+        : row.machine === 'S2'
+          ? `<span class="badge badge-warn" style="font-family:var(--font-mono);">[S-2]</span>`
           : `<span class="badge badge-neutral">—</span>`;
 
     const transition = (e.value_before || e.value_after)
       ? `<span class="tracking-num" style="font-size:12px;">${e.value_before || '—'} → ${e.value_after || '—'}</span>`
       : `<span class="tracking-num" style="font-size:12px;">${e.notes || '—'}</span>`;
 
-    // v3.2.0 — عمود النتيجة: نجاح / تحذير / فشل + اللي حصل فعليًا.
-    // السجلات الأقدم من v3.2.0 مالهاش extra.result — بتتعرض كـ"—" مش كنجاح،
-    // لأننا مش عارفين إن كان الاسترجاع حصل فعلاً وقتها.
-    const result   = extra.result || null;
+    // السجلات الأقدم من v3.2.0 مالهاش extra.result — بتتعرض "—" مش "✓"،
+    // لأننا مش عارفين إن كان الفعل تم وقتها.
     const restockA = (extra.actions || []).find(a => String(a).startsWith('restock×') || String(a).startsWith('reverseDispose×'));
     const units    = restockA ? String(restockA).split('×')[1] : null;
     const warn     = (extra.warnings || []).join(' · ');
 
-    const resultBadge = isLegacy
+    const resultBadge = row.isLegacy
       ? `<span class="badge badge-neutral">—</span>`
-      : result === 'success' ? `<span class="badge badge-success">✓ تم</span>`
-      : result === 'warning' ? `<span class="badge badge-warn" title="${warn.replace(/"/g, '')}">⚠ جزئي</span>`
-      : result === 'error'   ? `<span class="badge badge-danger" title="${String(extra.error || '').replace(/"/g, '')}">✗ فشل</span>`
+      : row.result === 'success' ? `<span class="badge badge-success">✓ تم</span>`
+      : row.result === 'warning' ? `<span class="badge badge-warn" title="${warn.replace(/"/g, '')}">⚠ جزئي</span>`
+      : row.result === 'error'   ? `<span class="badge badge-danger" title="${String(extra.error || '').replace(/"/g, '')}">✗ فشل</span>`
       : `<span class="badge badge-neutral" title="سجل قبل v3.2.0 — النتيجة ماكانتش بتتسجل">—</span>`;
 
     const resultCell = `${resultBadge}` +
-      (units ? `<br><span class="reject-reason" style="color:var(--text-sub);">${units} قطعة للمخزن</span>` : '') +
+      (units ? `<br><span class="reject-reason" style="color:var(--text-secondary);">${units} قطعة للمخزن</span>` : '') +
       (warn  ? `<br><span class="reject-reason" style="color:var(--amber);">${warn}</span>` : '');
 
     return `
       <tr>
-        <td class="log-ts">${formatDateTime(e.timestamp)}</td>
-        <td class="log-emp">${e.employee || '—'}</td>
+        <td class="log-ts">${formatDate(e.timestamp)}</td>
+        <td class="log-ts">${formatTimeOnly(e.timestamp)}</td>
+        <td class="log-emp">${row.emp || '—'}</td>
         <td class="log-order">${e.order_name ? orderLink(e.order_name, e.order_id) : '—'}</td>
         <td>${machineBadge}</td>
         <td>${transition}</td>
         <td>${resultCell}</td>
-        <td class="log-ts">${tn}</td>
+        <td class="log-ts">${row.tn || '—'}</td>
       </tr>`;
   }).join('');
 }
@@ -1983,16 +2905,20 @@ function goPage(dir) {
   fetchLog();
 }
 
-// ══ Export Log XLSX ════════════════════════════════════════════════════════════
-async function exportLogXLSX() {
-  const employee = document.getElementById('logFilterEmployee').value || null;
-  const search   = document.getElementById('logSearch').value.trim()  || null;
-  const params = {};
-  if (employee) params.employee = employee;
-  if (search)   params.search   = search;
+// ─── §LOG-JS::exportLogXLSX ───
+// ⚠️ الـ Worker بيقص التصدير عند سقف (`cap`). لو الواجهة قالت "تم التصدير ✓"
+// على ملف مقصوص، الموظف بياخده على إنه كامل — ولو راح لتقرير أو مراجعة مالية
+// الفرق مابيبانش. عشان كده: بانر **ثابت** فوق الجدول بالرقمين صراحةً + توست
+// خطأ، ورسالة النجاح في فرع `else` بس، والسقف بيرجع من الـ Worker مش مكتوب هنا.
+function clearExportWarn() {
+  const w = document.getElementById('logExportWarn');
+  if (w) { w.style.display = 'none'; w.innerHTML = ''; }
+}
 
+async function exportLogXLSX() {
+  clearExportWarn();
   try {
-    const data    = await apiGet('get_logs_export', params);
+    const data    = await apiGet('get_logs_export', logParams());   // نفس مصدر الفلاتر
     const entries = data.entries || [];
     if (!entries.length) { showToast('السجل فارغ', 'error'); return; }
 
@@ -2001,23 +2927,26 @@ async function exportLogXLSX() {
     const ws = wb.addWorksheet('السجل');
     ws.views = [{ state: 'frozen', ySplit: 1, rightToLeft: true }];
     ws.columns = [
-      { header: 'التاريخ والوقت', key: 'ts',        width: 24 },
-      { header: 'الموظف',         key: 'emp',       width: 16 },
-      { header: 'الأوردر',        key: 'order',     width: 16 },
-      { header: 'الماكينة',       key: 'machine',   width: 12 },
-      { header: 'من',             key: 'before',    width: 18 },
-      { header: 'إلى',            key: 'after',     width: 18 },
-      { header: 'رقم التتبع',     key: 'tn',        width: 18 },
-      { header: 'نوع بوسطة',      key: 'orderType', width: 14 },
-      { header: 'النتيجة',        key: 'result',    width: 12 },
-      { header: 'قطع للمخزن',     key: 'units',     width: 12 },
-      { header: 'ملاحظات/تحذيرات', key: 'warn',     width: 44 },
+      { header: 'التاريخ',          key: 'date',      width: 14 },
+      { header: 'الوقت',            key: 'time',      width: 14 },
+      { header: 'الموظف',           key: 'emp',       width: 16 },
+      { header: 'الأوردر',          key: 'order',     width: 16 },
+      { header: 'الماكينة',         key: 'machine',   width: 12 },
+      { header: 'من',               key: 'before',    width: 18 },
+      { header: 'إلى',              key: 'after',     width: 18 },
+      { header: 'رقم التتبع',       key: 'tn',        width: 18 },
+      { header: 'نوع بوسطة',        key: 'orderType', width: 14 },
+      { header: 'النتيجة',          key: 'result',    width: 12 },
+      { header: 'قطع للمخزن',       key: 'units',     width: 12 },
+      { header: 'ملاحظات/تحذيرات',  key: 'warn',      width: 44 },
     ];
     entries.forEach(e => {
       const extra = e.extra ? (typeof e.extra === 'string' ? JSON.parse(e.extra) : e.extra) : {};
       const restockA = (extra.actions || []).find(a => String(a).startsWith('restock×') || String(a).startsWith('reverseDispose×'));
       ws.addRow({
-        ts:        formatDateTime(e.timestamp),
+        // ⚠️ بدون إيموجي في خلايا Excel — بتكسر الفرز والفلترة جوّه الشيت
+        date:      formatDateForExport(e.timestamp),
+        time:      formatTimeForExport(e.timestamp),
         emp:       e.employee   || '—',
         order:     e.order_name || '—',
         machine:   extra.machine || (e.type === 'returned' ? 'تاج (قديم)' : '—'),
@@ -2039,13 +2968,25 @@ async function exportLogXLSX() {
     const a    = document.createElement('a');
     a.href = url; a.download = `bosta-returned-log-${new Date().toISOString().slice(0,10)}.xlsx`;
     a.click(); URL.revokeObjectURL(url);
-    showToast('تم تصدير السجل', 'success');
+
+    // ⬇️ الحقيقة بتيجي من الـ Worker — ممنوع الواجهة تكتب السقف عندها
+    const truncated = data.truncated === true || (data.cap && entries.length >= data.cap);
+    const warn = document.getElementById('logExportWarn');
+    if (truncated) {
+      warn.innerHTML = `⚠️ <b>التصدير اتقص</b> — الملف فيه ${entries.length.toLocaleString('en-US')} صف`
+        + (data.total != null ? ` من أصل <b>${data.total.toLocaleString('en-US')}</b> مطابقين للفلاتر` : '')
+        + `. ضيّق الفترة أو الفلاتر وصدّر على دفعات.`;
+      warn.style.display = '';
+      showToast(`⚠️ التصدير اتقص عند ${entries.length.toLocaleString('en-US')} صف — الملف مش كامل`, 'error', 7000);
+    } else {
+      showToast(`تم تصدير ${entries.length.toLocaleString('en-US')} عملية ✓`, 'success');
+    }
   } catch (err) {
     showToast(`خطأ: ${err.message}`, 'error');
   }
 }
 
-// ══ Auto-focus ═════════════════════════════════════════════════════════════════
+// ─── §TOOL-JS::autoFocus ───
 document.addEventListener('click', e => {
   if (document.querySelector('.settings-overlay.open')) return;
   if (document.querySelector('.eco-overlay.open')) return;
@@ -2057,14 +2998,31 @@ document.addEventListener('click', e => {
   }
 });
 
-// ══ Init ════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// §INIT
+// ══════════════════════════════════════════════════════════════
 (function init() {
+  renderVersionUI();          // مصدر واحد لرقم النسخة في التلات أماكن
   updateSettingsBtn();
-  updateLoginSettingsBtnState();
+  updateLoginSettingsBtn();
+
+  // فلاتر السجل — القوايم الثابتة تترسم فورًا، وقائمة الموظفين بتتملي من
+  // get_employees في loadEmployeesList()
+  msRenderList('result');
+  msRenderList('machine');
+  msRenderList('emp');
+  renderChips();
+  updateFilterIconState();
+  updateSortHeaderUI();
+
+  buildTabChipMenu();
+  updateTabChip();
+  measureSticky();            // ⚠️ **بعد** رسم التابات والـ chip — قبلهم الارتفاع مش نهائي
+
   const cfg = getConfig();
   if (cfg.url && cfg.secret) {
     loadEmployeesList();
-    checkWorkerVersion();   // v3.2.0 — تحذير فوري لو النسخة المنشورة مش المتوقعة
+    checkWorkerVersion();     // بيولّع بس لو الـ Worker أقدم من MIN_WORKER_VERSION
   }
 })();
 </script>

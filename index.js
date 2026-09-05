@@ -5,6 +5,28 @@
 //                       (extra.sourceTool = "bosta_orders_returned_scanner" — see §CONSTANTS)
 //
 // ═══════════════════════════════════════════════════════════════════════════
+// v3.3.0 — "الانتظار المشروط + التصدير الصادق" (05-09-2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// مراجعة كاملة مقابل `ecommoda-worker-builder` v2.0.0. البندان الكاسران:
+//
+//   ① التحقق بعد ميوتيشن غير متزامنة لازم **يستنى**، مايقراش فورًا.
+//      `verifyCancels` كانت بتنام مدد ثابتة وتقرا الأوردر من غير ما تبص على
+//      الـ Job نفسه — نفس عطل `Order-Cancel` (#53033): القراءة بتسبق التأكيد
+//      بثانية، فكل إلغاء ناجح بيطلع أصفر، والموظف بيتعوّد يتجاهل الأصفر.
+//      دلوقتي: backoff متصاعد [400,700,1100,1600,2200] + فحص `job(id){ done }`
+//      مجمّع بالـ aliases + الوقوف على أول تأكيد، و`{ jobDone, attempts,
+//      waitedMs }` بترجع للواجهة وبتتسجّل في D1 عشان الأصفر يبقى قابل للتشخيص.
+//
+//   ② `get_logs_export` كان بيرجّع `entries` لوحدها والدالة بتقص عند 2000 صف
+//      في السكوت → الواجهة بتقول "تم التصدير ✓" على ملف ناقص. دلوقتي
+//      `LOG_EXPORT_MAX` ثابت مسمّى، و`getLogsCount` بيتنادى بالتوازي **بنفس
+//      الفلاتر بالظبط**، والرد بقى `{ entries, cap, total, truncated }`.
+//
+// ومعاهم: `buildLogFilterSQL` + `logParamsFrom` (فلاتر السجل بقت قوايم +
+// مدى تاريخ — شرط تنفيذ بند ٢١ في `data-table-standard`)، ومنع تكرار نفس
+// الأوردر في نفس الدفعة (رقمين تتبع لنفس الأوردر كانوا بيلغوه مرتين)،
+// و`Invalid disposition quantity` بقت "مسترجَع قبل كده" مش فشل.
+//
 // v3.2.0 — "مفيش نجاح من غير دليل" (23-08-2026)
 // ═══════════════════════════════════════════════════════════════════════════
 // خلفية العطل اللي أنتج الإصدار ده: من 19-08 لحد 23-08 الأداة سجّلت
@@ -43,9 +65,13 @@
 //   ?action=diag             GET   — فحص ذاتي كامل بدون أي كتابة  ← جديد v3.2.0
 //   ?action=lookup           POST  — Bosta search + Shopify batch check + validation
 //   ?action=update           POST  — تنفيذ + **تحقق** + D1 log (نجاح/تحذير/فشل)
-//   ?action=get_logs         GET   — server-side search + pagination
-//   ?action=get_logs_count   GET
-//   ?action=get_logs_export  GET
+//   ?action=get_logs         GET   — server-side filtering + pagination (100/صفحة)
+//   ?action=get_logs_count   GET   — العدّ المطابق لنفس الفلاتر
+//   ?action=get_logs_export  GET   — التصدير + { cap, total, truncated }
+//
+// فلاتر السجل (نفس المجموعة على التلاتة):
+//   employees=a,b · types=x,y · results=success,warning,error · machines=S1,S2
+//   · search · dateFrom · dateTo    (employee/type المفردين مقبولين للتوافق)
 //
 // D1 Binding:   DB
 // Secrets:      WORKER_SECRET, CLIENT_ID, CLIENT_SECRET, BOSTA_API_KEY
@@ -61,12 +87,13 @@
 //    (`write_returns` هي اللي كانت ناقصة وسببت عطل 19→23-08. شغّل ?action=diag
 //     بعد أي تغيير في التطبيق للتأكد إنها لسه موجودة.)
 //
-// skills: worker-builder v1.0.0 · constants v1.2.0 — 26-08-2026
+// skills: worker-builder v2.0.0 · constants v1.4.4 · order-lifecycle v1.2.0 ·
+//         shopify-graphql-helper v1.0.0 — 05-09-2026
 
 // ══════════════════════════════════════════════════════════════
 // §CONSTANTS
 // ══════════════════════════════════════════════════════════════
-const WORKER_VERSION   = '3.2.0';
+const WORKER_VERSION   = '3.3.0';
 const API_VERSION      = '2026-01';                          // صريح دايمًا — أبدًا "latest"
 const TOOL_NAME        = 'bosta_return';                     // login/logout D1 logging only — unchanged
 const SOURCE_TOOL      = 'bosta_orders_returned_scanner';    // used in extra.sourceTool for status-write logs
@@ -74,7 +101,21 @@ const SOURCE_TOOL_LIKE = `%"sourceTool":"${SOURCE_TOOL}"%`;
 const BOSTA_API_BASE   = 'https://app.bosta.co/api/v2';
 
 // الصلاحيات اللي الأداة مش هتشتغل من غيرها — بيتفحصوا في ?action=diag
-const REQUIRED_SCOPES = ['read_orders', 'write_orders', 'read_returns', 'write_returns'];
+// v3.3.0 — القايمة كانت أربعة بس بينما رأس الملف و`CLAUDE.md` بيقولوا سبعة.
+// `read_locations` بالذات فحص الـ LOCATION_ID في diag معتمد عليها، وغيابها كان
+// بيطلّع رسالة خطأ عامة بدل ما يقول اسم الصلاحية الناقصة.
+const REQUIRED_SCOPES = [
+  'read_orders', 'write_orders',
+  'read_returns', 'write_returns',
+  'read_inventory', 'write_inventory',
+  'read_locations',
+];
+
+// ─── §CONSTANTS::log — سقف التصدير ───
+// v3.3.0 — كان `LIMIT 2000` مكتوب حرفيًا جوه `getLogsExport`. السقف نفسه صح
+// (مفيش تصدير بلا سقف)، الغلط إنه ما كانش بيرجع للواجهة — فالواجهة بتقول
+// "تم التصدير ✓" على ملف مقصوص. دلوقتي بيرجع كـ `cap` جنب `total`/`truncated`.
+const LOG_EXPORT_MAX = 2000;
 
 // §CONSTANTS::status — verbatim strings from ecommoda-order-lifecycle (casing is load-bearing)
 const S1_STATUS = {
@@ -269,31 +310,6 @@ async function writeLog(db, entry) {
   ).run();
 }
 
-async function getLogs(db, {
-  tool     = null,
-  employee = null,
-  type     = null,
-  search   = null,
-  limit    = 200,
-  offset   = 0,
-} = {}) {
-  let sql = 'SELECT * FROM logs WHERE 1=1';
-  const b = [];
-
-  if (tool)     { sql += ' AND tool = ?';     b.push(tool); }
-  if (employee) { sql += ' AND employee = ?'; b.push(employee); }
-  if (type)     { sql += ' AND type = ?';     b.push(type); }
-  if (search) {
-    sql += ' AND (sku LIKE ? OR product_title LIKE ? OR order_name LIKE ? OR notes LIKE ?)';
-    b.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
-  }
-
-  sql += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
-  b.push(Math.min(limit, 500), offset);
-
-  return (await db.prepare(sql).bind(...b).all()).results;
-}
-
 // ══════════════════════════════════════════════════════════════
 // END §SHARED BLOCK
 // ══════════════════════════════════════════════════════════════
@@ -305,38 +321,110 @@ async function getLogs(db, {
 // ⚠️ السجل التاريخي: قبل v3.0.0 كانت الأداة بتسجل تحت tool='bosta_return' و
 // type='returned' (نظام التاجات القديم). الشرط تحت بيضم النوعين مع بعض عشان
 // السجل القديم يفضل ظاهر — من غيره تاب السجل بيبان فاضي تمامًا.
+//
+// ⚠️ ليه مفيش `AND tool = ?` زي `references/shared-functions.md`: نطاق الأداة
+// دي مش قيمة `tool` واحدة — هو **كاتب** جوه دلو مشترك (`metafields_change`)
+// بيميّزه `extra.sourceTool`، زائد نطاق تاريخي باسم قديم. باقي العقد (القوايم
+// المتعددة · مدى التاريخ · استبعاد login/logout في SQL · مصدر شرط واحد للتلات
+// دوال) متطبّق حرفيًا.
 const LOG_SCOPE_SQL = `(
      (tool = 'metafields_change' AND type = 'update'   AND extra LIKE ?)
   OR (tool = 'bosta_return'      AND type = 'returned')
 )`;
 
-async function getLogsCount(db, { employee = null, search = null } = {}) {
-  let sql = `SELECT COUNT(*) as total FROM logs WHERE ${LOG_SCOPE_SQL}`;
+// ─── §LOG-ENDPOINTS::buildLogFilterSQL ───
+// v3.3.0 — بنّاء الشرط الوحيد للتلات دوال (`get_logs` · `get_logs_count` ·
+// `get_logs_export`)، فمفيش SQL مكرر يتعتّق في واحدة ويسيب التانية — وده
+// بالظبط اللي بيخلي التصدير ينزّل غير المعروض.
+//
+// كل الباراميترات اختيارية، والسلوك من غيرها **مطابق للنسخة القديمة بالحرف**:
+//   employees[] / types[] / results[] / machines[]  → قوايم (multi-select
+//        إلزامي في أي شاشة فيها جدول — `data-table-standard` بند ٢١).
+//   employee / type                                → قيمة واحدة، متسابة للتوافق.
+//   results[] / machines[] بيتفلتروا على `extra` JSON (`"result":"warning"` ·
+//        `"machine":"S1"`) — دول الفلترين اللي ليهم معنى تشغيلي في الأداة دي،
+//        لأن كل صفوفها `type = 'update'`.
+//   dateFrom / dateTo → بيتقارنوا بـ substr(timestamp,1,10) يعني **UTC**، والعرض
+//        بتوقيت القاهرة (UTC+3). فرق التلات ساعات ممكن يحط عملية بعد ٩ مساءً
+//        بتوقيت القاهرة في يوم UTC اللي بعده. مقبول لفلتر بالأيام — **بس مكتوب**.
+function buildLogFilterSQL(select, {
+  employee = null, employees = null,
+  type     = null, types     = null,
+  results  = null, machines  = null,
+  search   = null,
+  dateFrom = null, dateTo    = null,
+} = {}) {
+  let sql = `${select} FROM logs WHERE type NOT IN ('login','logout') AND ${LOG_SCOPE_SQL}`;
   const b = [SOURCE_TOOL_LIKE];
 
-  if (employee) { sql += ' AND employee = ?'; b.push(employee); }
-  if (search) {
-    sql += ' AND (order_name LIKE ? OR notes LIKE ?)';
-    b.push(`%${search}%`, `%${search}%`);
+  const emps = Array.isArray(employees) && employees.length ? employees : (employee ? [employee] : []);
+  const typs = Array.isArray(types)     && types.length     ? types     : (type     ? [type]     : []);
+
+  if (emps.length) { sql += ` AND employee IN (${emps.map(() => '?').join(',')})`; b.push(...emps); }
+  if (typs.length) { sql += ` AND type IN (${typs.map(() => '?').join(',')})`;     b.push(...typs); }
+
+  if (Array.isArray(results) && results.length) {
+    sql += ` AND (${results.map(() => 'extra LIKE ?').join(' OR ')})`;
+    b.push(...results.map(v => `%"result":"${v}"%`));
+  }
+  if (Array.isArray(machines) && machines.length) {
+    sql += ` AND (${machines.map(() => 'extra LIKE ?').join(' OR ')})`;
+    b.push(...machines.map(v => `%"machine":"${v}"%`));
   }
 
+  if (search)   { sql += ' AND (order_name LIKE ? OR notes LIKE ?)'; b.push(`%${search}%`, `%${search}%`); }
+  if (dateFrom) { sql += ' AND substr(timestamp, 1, 10) >= ?'; b.push(dateFrom); }
+  if (dateTo)   { sql += ' AND substr(timestamp, 1, 10) <= ?'; b.push(dateTo); }
+
+  return { sql, b };
+}
+
+// ─── §LOG-ENDPOINTS::getLogs ───
+// صفحة واحدة للعرض — السقف 100 صف، مفروض من السيرفر. ⚠️ ممنوع تستخدمها
+// للتصدير (`getLogsExport` هي المخصصة لده).
+async function getLogs(db, { limit = 100, offset = 0, ...filters } = {}) {
+  const { sql, b } = buildLogFilterSQL('SELECT *', filters);
+  const q = sql + ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
+  return (await db.prepare(q).bind(...b, Math.min(limit, 100), Math.max(offset, 0)).all()).results;
+}
+
+// ─── §LOG-ENDPOINTS::getLogsCount ───
+// بيتنادى بالتوازي مع `getLogs` (للـ pagination) **ومع `getLogsExport`** (عشان
+// `total` و`truncated`). نفس الفلاتر بالظبط — نداء بفلاتر مختلفة بيطلّع نسبة
+// "٢٠٠٠ من ٥٠٠٠" كذّابة، وهي أسوأ من مفيش رقم.
+async function getLogsCount(db, filters = {}) {
+  const { sql, b } = buildLogFilterSQL('SELECT COUNT(*) as total', filters);
   const row = await db.prepare(sql).bind(...b).first();
   return row?.total ?? 0;
 }
 
-async function getLogsExport(db, { employee = null, search = null } = {}) {
-  let sql = `SELECT * FROM logs WHERE ${LOG_SCOPE_SQL}`;
-  const b = [SOURCE_TOOL_LIKE];
+// ─── §LOG-ENDPOINTS::getLogsExport ───
+// ⚠️ الدالة دي **بتقص في السكوت** بطبيعتها عند `LOG_EXPORT_MAX`. المسؤولية
+// اللي جنبها إلزامية: الـ endpoint لازم يرجّع `cap` و`total` و`truncated`.
+async function getLogsExport(db, filters = {}) {
+  const { sql, b } = buildLogFilterSQL('SELECT *', filters);
+  const q = sql + ' ORDER BY timestamp DESC LIMIT ?';
+  return (await db.prepare(q).bind(...b, LOG_EXPORT_MAX).all()).results;
+}
 
-  if (employee) { sql += ' AND employee = ?'; b.push(employee); }
-  if (search) {
-    sql += ' AND (order_name LIKE ? OR notes LIKE ?)';
-    b.push(`%${search}%`, `%${search}%`);
-  }
-
-  sql += ' ORDER BY timestamp DESC LIMIT 2000';
-
-  return (await db.prepare(sql).bind(...b).all()).results;
+// ─── §LOG-ENDPOINTS::logParamsFrom ───
+// مصدر واحد لقراءة الفلاتر من الـ query string — التلات endpoints بتستخدمه،
+// فمفيش endpoint بيفلتر بشكل مختلف عن اللي جنبه. القوايم CSV.
+function logParamsFrom(url) {
+  const csv = (k) => (url.searchParams.get(k) || '').split(',').map(s => s.trim()).filter(Boolean);
+  const employees = csv('employees'), types = csv('types');
+  const results   = csv('results'),   machines = csv('machines');
+  return {
+    employees: employees.length ? employees : null,
+    employee:  url.searchParams.get('employee') || null,
+    types:     types.length ? types : null,
+    type:      url.searchParams.get('type')     || null,
+    results:   results.length  ? results  : null,
+    machines:  machines.length ? machines : null,
+    search:    url.searchParams.get('search')   || null,
+    dateFrom:  url.searchParams.get('dateFrom') || null,
+    dateTo:    url.searchParams.get('dateTo')   || null,
+  };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -580,6 +668,12 @@ async function fetchShopifyOrdersByNames(env, token, orderNames) {
 // ما أنشأتش أي reverseFulfillmentOrder — فالميتافيلد كان هيتكتب "Returned"
 // والمخزون ما يرجعش، وهو بالظبط نوع الفشل النصفي اللي الإصدار ده بيقفله.
 function validateTransition(orderType, sOrder) {
+  // ⚠️ قرار مقصود (مؤكَّد من أحمد 05-09-2026): `Send` هو الرفض الوحيد على مستوى
+  // نوع الشحنة. أي نوع تاني من بوسطة — `RTO` · `Return` · `EXCHANGE` ·
+  // `CUSTOMER_RETURN_PICKUP` · حتى `CASH_COLLECTION` — بيعدّي لفحص شوبيفاي،
+  // وحراسات S1/S2/returnStaty تحت هي اللي بترفض اللي مالوش مسار صحيح.
+  // ده **مش سهو**: قايمة أنواع بوسطة بتتوسّع من غير إشعار، وقايمة سماح مقفولة
+  // كانت هترفض شحنات مرتجعة سليمة بسبب اسم نوع جديد.
   const isSend = String(orderType || '').trim().toLowerCase() === 'send';
   if (isSend) {
     return { valid: false, reason: 'نوع الشحنة "Send" — شحن أصلي، مش من اختصاص أداة المرتجعات' };
@@ -776,7 +870,7 @@ function summarizeReturns(returns, locationId) {
 // بترجّع تفصيل كامل بدل رقم واحد: { requested, confirmed, alreadyDone, remainingAfter, skipped }
 async function disposeReturns(env, token, locationId, returns) {
   const locGid = `gid://shopify/Location/${locationId}`;
-  const out = { requested: 0, confirmed: 0, alreadyDone: 0, skippedNotOpen: 0, calls: 0 };
+  const out = { requested: 0, confirmed: 0, alreadyDone: 0, skippedNotOpen: 0, conflicts: 0, calls: 0 };
 
   for (const ret of (returns || [])) {
     for (const rfo of (ret.reverseFulfillmentOrders?.nodes || [])) {
@@ -812,7 +906,19 @@ async function disposeReturns(env, token, locationId, returns) {
       const result = resp.data?.reverseFulfillmentOrderDispose;
       const errs   = result?.userErrors || [];
       if (errs.length) {
-        throw new Error(`reverseDispose: ${errs.map(e => e.message).join(' | ')}`);
+        const msg = errs.map(e => e.message).join(' | ');
+        // ⚠️ v3.3.0 — الحالة دي كانت متوثّقة في التعليق فوق ("بنقول مسترجَع قبل
+        // كده بدل ما نفشل") ومكانتش متنفّذة فعليًا. بتحصل لما حد يسبقنا بين
+        // القراءة والكتابة (Flow / استلام يدوي) فالكمية المتبقية بتبقى قديمة.
+        // مش فشل — القطع رجعت للمخزن فعلاً، بس مش إحنا اللي رجّعناها.
+        if (/invalid disposition quantity/i.test(msg)) {
+          const q = inputs.reduce((s, i) => s + i.quantity, 0);
+          out.requested   -= q;
+          out.alreadyDone += q;
+          out.conflicts++;
+          continue;
+        }
+        throw new Error(`reverseDispose: ${msg}`);
       }
 
       // ⚠️ العدّ من رد شوبيفاي — مش من المطلوب. النسخة القديمة كانت
@@ -830,29 +936,103 @@ async function disposeReturns(env, token, locationId, returns) {
   return out;
 }
 
+// ─── §SHOPIFY::VERIFY_DELAYS_MS ───
+// backoff متصاعد، مجموعه ≈٦ ثوانٍ. الأرقام دي مش اختيار حر — هي النمط المعتمد
+// في `ecommoda-worker-builder` Step 5A ③ بعد قياس فعلي على `#53033`.
+const VERIFY_DELAYS_MS = [400, 700, 1100, 1600, 2200];
+
+// ─── §SHOPIFY::areJobsDone ───
+// فحص حالة أكتر من Job في نداء واحد بالـ aliases (مش نداء لكل أوردر).
+// القيمة لكل job: true / false / **null**. و`null` معناها "ما عرفناش" —
+// يعني **كمّل واقرا المورد**، مش "لسه شغّال". الفرق ده مهم: لو الاستعلام نفسه
+// فشل وحسبناها "لسه شغّال"، هنتخطى القراءة اللي كانت هتأكد الإلغاء فعلاً.
+async function areJobsDone(env, token, jobIds) {
+  const uniq = [...new Set(jobIds.filter(Boolean))];
+  const out  = {};
+  for (const id of uniq) out[id] = null;
+
+  for (let i = 0; i < uniq.length; i += 20) {
+    const chunk   = uniq.slice(i, i + 20);
+    const varDefs = chunk.map((_, idx) => `$id${idx}: ID!`).join(', ');
+    const body    = chunk.map((_, idx) => `j${idx}: job(id: $id${idx}) { id done }`).join('\n        ');
+    const vars    = {};
+    chunk.forEach((id, idx) => { vars[`id${idx}`] = id; });
+
+    try {
+      const resp = await shopifyGQL(env, token, `query JobsDone(${varDefs}) {\n        ${body}\n      }`, vars, 'حالة الـ Jobs');
+      chunk.forEach((id, idx) => {
+        const done = resp.data?.[`j${idx}`]?.done;
+        out[id] = typeof done === 'boolean' ? done : null;
+      });
+    } catch {
+      // بنسيبهم null — "ما عرفناش" مش "لسه شغّال"
+    }
+  }
+  return out;
+}
+
 // ─── §SHOPIFY::verifyCancels ───
-// تحقق مجمّع بعد الدفعة: orderCancel بترجّع job، والإلغاء الحقيقي بيحصل بعد
+// تحقق مجمّع بعد الدفعة: `orderCancel` بترجّع job، والإلغاء الحقيقي بيحصل بعد
 // الرد بثانية أو اتنين. من غير التحقق ده الأداة ممكن تقول "تم" على أوردر
 // الإلغاء بتاعه فشل في الخلفية — نفس عائلة الفشل الصامت اللي بنقفلها.
+//
+// ⚠️ v3.3.0 — "تحقق لاحق" لوحدها **مش كفاية**، والنسخة القديمة هنا كانت مثال
+// حي على ده: مدد نوم ثابتة [1200,2000,3000] وقراءة للأوردر من غير أي نظرة على
+// الـ Job نفسه. `Order-Cancel` كانت مطبّقة نفس الفكرة حرفيًا وكانت غلط — الدليل
+// المقاس (D1 + شوبيفاي، `#53033`، 01-09-2026): الميوتيشن اتقبلت 07:51:25Z،
+// الـ Worker قرا 07:51:26.084Z ولقى `cancelledAt = null` وسجّل confirmed:false،
+// وشوبيفاي سجّلت `cancelledAt` في 07:51:27Z. النتيجة إن **كل** إلغاء ناجح
+// بيظهر أصفر "لسه مش مؤكَّد" — الحالة الاستثنائية بقت الافتراضية، والموظف
+// بيتعوّد يتجاهل الأصفر، فلما يحصل إلغاء فعلًا مش مؤكَّد مفيش إشارة.
+//
+// النمط المعتمد: backoff متصاعد + فحص `job(id){ done }` نفسه، والوقوف على أول
+// تأكيد. مفيش نوم ثابت غير مشروط.
 //
 // بيتأكد من حاجتين لكل أوردر:
 //   • cancelledAt اتسجّل فعلاً
 //   • فيه دليل استرجاع مخزون (refundLineItems بكمية > 0 اتعملت بعد بداية
 //     العملية) — لأن الإلغاء نفسه مش معناه إن المخزون رجع.
+//
+// وبيسجّل على كل سجل `{ jobDone, attempts, waitedMs }` — انتهاء المهلة من غير
+// تأكيد = **`warning`** (مش "تم" ومش "فشل")، والأرقام دي هي اللي بتخلي الأصفر
+// قابل للتشخيص بعدين بدل ما يكون مجرد "مش عارفين".
 async function verifyCancels(env, token, records) {
   const pending = records.filter(r => r.needsCancelVerify);
   if (!pending.length) return;
 
-  const DELAYS = [1200, 2000, 3000];
+  // ⚠️ دمج مش استبدال — النسخة القديمة كانت بتكتب object جديد فوق القديم
+  // فبيضيع `jobId` (والـ `verifyError`)، والتحذير بيفضل من غير أي خيط تشخيص.
+  pending.forEach(r => {
+    r.cancel = { ...(r.cancel || {}), verified: false, jobDone: null, attempts: 0, waitedMs: 0 };
+  });
 
-  for (let attempt = 0; attempt < DELAYS.length; attempt++) {
-    const left = pending.filter(r => !r.cancel?.verified);
+  let waitedMs = 0;
+
+  for (let attempt = 0; attempt < VERIFY_DELAYS_MS.length; attempt++) {
+    const left = pending.filter(r => !r.cancel.verified);
     if (!left.length) return;
 
-    await sleep(DELAYS[attempt]);
+    await sleep(VERIFY_DELAYS_MS[attempt]);
+    waitedMs += VERIFY_DELAYS_MS[attempt];
+    left.forEach(r => { r.cancel.attempts = attempt + 1; r.cancel.waitedMs = waitedMs; });
 
-    for (let i = 0; i < left.length; i += 20) {
-      const chunk = left.slice(i, i + 20);
+    // ① الـ Job نفسه — نداء واحد مجمّع. اللي لسه شغّال (`false` صريحة)
+    //    مانضيّعش عليه نداء قراءة في الجولة دي.
+    const jobTargets = left.filter(r => r.cancel.jobId && r.cancel.jobDone !== true);
+    if (jobTargets.length) {
+      const doneMap = await areJobsDone(env, token, jobTargets.map(r => r.cancel.jobId));
+      jobTargets.forEach(r => {
+        const d = doneMap[r.cancel.jobId];
+        r.cancel.jobDone = (d === undefined ? null : d);
+      });
+    }
+
+    const toRead = left.filter(r => r.cancel.jobDone !== false);
+    if (!toRead.length) continue;
+
+    // ② قراءة المورد نفسه — الدليل النهائي
+    for (let i = 0; i < toRead.length; i += 20) {
+      const chunk = toRead.slice(i, i + 20);
       let resp;
       try {
         resp = await shopifyGQL(env, token, `
@@ -874,7 +1054,7 @@ async function verifyCancels(env, token, records) {
         `, { ids: chunk.map(r => r.orderGid) }, 'التحقق من الإلغاء');
       } catch (e) {
         // التحقق نفسه فشل — نسجّله كتحذير، مش كفشل للعملية
-        chunk.forEach(r => { r.cancel = { ...(r.cancel || {}), verifyError: e.message }; });
+        chunk.forEach(r => { r.cancel.verifyError = e.message; });
         continue;
       }
 
@@ -885,18 +1065,20 @@ async function verifyCancels(env, token, records) {
         const node = byGid[r.orderGid];
         if (!node) continue;
 
+        // ⚠️ نافذة ٥ ثوانٍ للفرق في الساعات بس — النسخة القديمة كانت ١٢٠ ثانية
+        // **قبل** بداية العملية، يعني refund قديم قريب كان بيتحسب دليل استرجاع
+        // كاذب على إلغاء النهاردة.
         const restockedUnits = (node.refunds || [])
-          .filter(rf => !r.startedAt || new Date(rf.createdAt).getTime() >= new Date(r.startedAt).getTime() - 120000)
+          .filter(rf => !r.startedAt || new Date(rf.createdAt).getTime() >= new Date(r.startedAt).getTime() - 5000)
           .flatMap(rf => rf.refundLineItems?.nodes || [])
           .filter(li => li.restockType && li.restockType !== 'NO_RESTOCK')
           .reduce((s, li) => s + (li.quantity || 0), 0);
 
-        r.cancel = {
-          verified:      !!node.cancelledAt,
-          cancelledAt:   node.cancelledAt || null,
-          restockedUnits,
-          metafieldNow:  node.s1?.value || null,
-        };
+        r.cancel.verified     = !!node.cancelledAt;
+        r.cancel.cancelledAt  = node.cancelledAt || null;
+        r.cancel.restockedUnits = restockedUnits;
+        r.cancel.metafieldNow = node.s1?.value || null;
+        if (r.cancel.verified) { r.cancel.jobDone = true; delete r.cancel.verifyError; }
       }
     }
   }
@@ -1005,42 +1187,38 @@ export default {
       // ─── §LOG-ENDPOINTS ─────────────────────────────────────────────────
 
       if (action === 'get_logs') {
-        const employee = url.searchParams.get('employee') || null;
-        const search   = url.searchParams.get('search')   || null;
+        const p = logParamsFrom(url);
         // v3.2.0 — حراسة الأرقام: parseInt على قيمة غلط كان بيدي NaN → D1 error غامض
         const limitRaw  = parseInt(url.searchParams.get('limit')  || '100', 10);
         const offsetRaw = parseInt(url.searchParams.get('offset') || '0',   10);
         const limit    = Number.isFinite(limitRaw)  ? Math.min(Math.max(limitRaw, 1), 100) : 100;
         const offset   = Number.isFinite(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
 
-        let sql = `SELECT * FROM logs WHERE ${LOG_SCOPE_SQL}`;
-        const b = [SOURCE_TOOL_LIKE];
-
-        if (employee) { sql += ' AND employee = ?'; b.push(employee); }
-        if (search) {
-          sql += ' AND (order_name LIKE ? OR notes LIKE ?)';
-          b.push(`%${search}%`, `%${search}%`);
-        }
-
-        sql += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
-        b.push(limit, offset);
-
-        const entries = (await env.DB.prepare(sql).bind(...b).all()).results;
+        const entries = await getLogs(env.DB, { ...p, limit, offset });
         return json({ ok: true, entries }, 200, request);
       }
 
       if (action === 'get_logs_count') {
-        const employee = url.searchParams.get('employee') || null;
-        const search   = url.searchParams.get('search')   || null;
-        const total    = await getLogsCount(env.DB, { employee, search });
+        const total = await getLogsCount(env.DB, logParamsFrom(url));
         return json({ ok: true, total }, 200, request);
       }
 
+      // get_logs_export — الصفوف **والحقيقة** مع بعض.
+      // ⛔ ممنوع يرجّع `entries` لوحدها: `getLogsExport` بتقص عند LOG_EXPORT_MAX
+      // في السكوت، فالواجهة كانت بتقول "تم التصدير ✓" على ملف ناقص والموظف
+      // فاكره كامل. `total` بيتحسب **بنفس الفلاتر بالظبط**.
       if (action === 'get_logs_export') {
-        const employee = url.searchParams.get('employee') || null;
-        const search   = url.searchParams.get('search')   || null;
-        const entries  = await getLogsExport(env.DB, { employee, search });
-        return json({ ok: true, entries }, 200, request);
+        const p = logParamsFrom(url);
+        const [entries, total] = await Promise.all([
+          getLogsExport(env.DB, p),
+          getLogsCount(env.DB, p),
+        ]);
+        return json({
+          ok: true, entries,
+          cap: LOG_EXPORT_MAX,
+          total,
+          truncated: total > LOG_EXPORT_MAX,
+        }, 200, request);
       }
 
       return json({ error: 'Unknown action' }, 404, request);
@@ -1150,6 +1328,13 @@ async function handleDiag(request, env) {
     } catch (e) {
       checks.location = { ok: false, error: e.message };
     }
+  } else {
+    // ⚠️ v3.3.0 — قبل كده المفاتيح دي كانت **بتختفي من الرد خالص** لو OAuth فشل،
+    // فالواجهة مابتعرضش أي سطر عنها. "ما اتفحصش" ≠ "تمام" — لازم تبان.
+    const notChecked = 'ما اتفحصش — الاتصال بشوبيفاي فشل (شوف فحص OAuth فوق)';
+    checks.shop     = { ok: false, error: notChecked };
+    checks.scopes   = { ok: false, error: notChecked };
+    checks.location = { ok: false, error: notChecked };
   }
 
   // 5) بوسطة — نداء بحث برقم وهمي: 200 = المفتاح شغال، 401/403 = مفتاح غلط
@@ -1342,6 +1527,12 @@ async function handleUpdate(request, env) {
 
   const records = [];
 
+  // ⚠️ v3.3.0 — حارس التكرار. `freshMap` بتتقري **مرة واحدة قبل الحلقة**، فلو
+  // رقمين تتبع بيرجعوا لنفس الأوردر (وارد فعليًا: شحنة RTO + شحنة مرتجع على
+  // نفس الأوردر)، التحقق بيعدّي على نفس اللقطة القديمة مرتين والأوردر بياخد
+  // `orderCancel` مرتين + كتابة ميتافيلد مرتين. والإلغاء لا رجعة فيه.
+  const seenOrders = new Set();
+
   // ══ (١) التنفيذ ══════════════════════════════════════════════════════════
   for (const item of items) {
     const cleanName = cleanOrderName(item.orderName);
@@ -1366,6 +1557,12 @@ async function handleUpdate(request, env) {
     };
 
     if (!cleanName)                 { rec.error = 'اسم الأوردر ناقص'; records.push(rec); continue; }
+    if (seenOrders.has(cleanName)) {
+      rec.error = 'الأوردر ده اتنفّذ فعلاً في نفس الدفعة (رقم تتبع تاني لنفس الأوردر) — اتخطّيناه عشان مايتلغيش مرتين';
+      records.push(rec); continue;
+    }
+    seenOrders.add(cleanName);
+
     const sOrder = freshMap[cleanName];
     if (!sOrder)                    { rec.error = 'الأوردر غير موجود على شوبيفاي'; records.push(rec); continue; }
 
@@ -1421,8 +1618,12 @@ async function handleUpdate(request, env) {
           try {
             const after = await fetchOrderReturns(env, token, sOrder.orderGid);
             const sum   = summarizeReturns(after, locationId);
-            rec.restock.verifiedUnits = sum.restockedHere;
+            rec.restock.verifiedUnits  = sum.restockedHere;
             rec.restock.remainingAfter = sum.remaining;
+            // v3.3.0 — الأرقام دي كانت بتتحسب في summarizeReturns وترمى.
+            // بتفرّق وقت التشخيص: RFO مفتوح ومتبقّي صفر ≠ RFO مقفول.
+            rec.restock.openRfosAfter  = sum.openRfos;
+            rec.restock.otherDisposed  = sum.otherDisposed;
             if (d.confirmed && sum.restockedHere < d.confirmed) {
               rec.warnings.push(`التحقق بعد التنفيذ لقى ${sum.restockedHere} قطعة مسترجَعة بس من ${d.confirmed} — راجع الأوردر يدويًا`);
             }
@@ -1457,8 +1658,14 @@ async function handleUpdate(request, env) {
     // تحذيرات ناتجة عن التحقق
     if (rec.needsCancelVerify && !rec.error) {
       if (!rec.cancel?.verified) {
+        // انتهاء المهلة من غير تأكيد = warning — مش "تم" ومش "فشل". والأرقام
+        // اللي معاها (jobDone/attempts/waitedMs) هي اللي بتخلي الأصفر قابل
+        // للتشخيص بدل ما يكون "مش عارفين" مجرّدة.
+        const jd = rec.cancel?.jobDone;
+        const jobTxt = jd === false ? 'الـ Job لسه شغّال' : (jd === true ? 'الـ Job خلص' : 'حالة الـ Job غير معروفة');
         rec.warnings.push(
-          'ما اتأكدناش إن الأوردر اتلغى فعلاً خلال المهلة' +
+          `ما اتأكدناش إن الأوردر اتلغى فعلاً خلال المهلة (${jobTxt} · ` +
+          `${rec.cancel?.attempts ?? 0} محاولات · ${rec.cancel?.waitedMs ?? 0}ms)` +
           (rec.cancel?.verifyError ? ` (${rec.cancel.verifyError})` : '') +
           ' — افتح الأوردر على شوبيفاي وتأكد'
         );
@@ -1502,6 +1709,13 @@ async function handleUpdate(request, env) {
             field:          rec.field,
             actions:        rec.actions,
             result:         status,               // success | warning | error
+            // تشخيص الانتظار المشروط — البند الكاسر في worker-builder v2.0.0
+            // بيطلبها في الرد وفي D1 عشان الحالة الصفرا تبقى قابلة للتشخيص.
+            verify: rec.needsCancelVerify ? {
+              jobDone:  rec.cancel?.jobDone  ?? null,
+              attempts: rec.cancel?.attempts ?? 0,
+              waitedMs: rec.cancel?.waitedMs ?? 0,
+            } : null,
             error:          rec.error,
             warnings:       rec.warnings,
             restock:        rec.restock,
@@ -1529,7 +1743,14 @@ async function handleUpdate(request, env) {
       warnings:    rec.warnings,
       error:       rec.error,
       restock:     rec.restock,
-      cancel:      rec.cancel ? { verified: rec.cancel.verified, restockedUnits: rec.cancel.restockedUnits } : null,
+      cancel:      rec.cancel ? {
+        verified:       rec.cancel.verified,
+        restockedUnits: rec.cancel.restockedUnits,
+        jobId:          rec.cancel.jobId    ?? null,
+        jobDone:        rec.cancel.jobDone  ?? null,
+        attempts:       rec.cancel.attempts ?? 0,
+        waitedMs:       rec.cancel.waitedMs ?? 0,
+      } : null,
       logged,
       logError,
     });
