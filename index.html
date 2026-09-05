@@ -1194,6 +1194,16 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
           <span class="cl-ver-date">05-09-2026</span>
         </div>
         <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>عمود "التحديث" في السجل كان بيوسّع الجدول كله لعرض هائل لما يحتوي سبب رفض طويل</b> — إصلاح v3.3.1 (اتجاه السكرول) صحّح مين الأعمدة اللي بتفتح افتراضيًا، بس ما لمسش السبب الحقيقي: نص <code>e.notes</code> (سبب الفشل الكامل) كان بيتحط في <code>.tracking-num</code> (مصمّمة لنص قصير سطر واحد، <code>white-space: nowrap</code> موروثة من الجدول) بدل <code>.reject-reason</code> (بتلف وعندها <code>max-width</code>) المستخدمة أصلًا لنفس الغرض في جدول النتائج. عمود واحد طويل كان بيمدّد الجدول لعرض أكبر بكتير من الشاشة (اتقاس: ٢٣٣٤px بدل ٩٠٠px في نفس الحاوية)، فالموظف كان لسه محتاج يمرّر مسافة كبيرة عشان يشوف "النتيجة"/"التتبع" — بس الاتجاه اتقلب بدل ما يتحل. دلوقتي النص بيلف جوّه ٢٣٠px زي عمود الرفض في جدول النتائج بالظبط</li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.3.1</span>
+          <span class="cl-ver-date">05-09-2026</span>
+        </div>
+        <ul class="cl-items">
           <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>جدول السجل وجدول النتائج كانا بيفتحوا على آخر أعمدتهم بدل أولها</b> — الصفحة كلها RTL، بس الجدولين متعمول عليهم <code>direction: ltr</code> عشان ترتيب الأعمدة يفضل ثابت، وحاوية السكرول (<code>.table-wrap</code>/<code>.log-table-wrap</code>) كانت بترث الـ RTL من الصفحة من غير ما تتحدد. النتيجة: أول ما الجدول يبقى أعرض من الشاشة، السكرول الأفقي بيفتح افتراضيًا من اليمين البصري، اللي بيوافق آخر الأعمدة (التحديث/النتيجة/التتبع في السجل) — والموظف بيشوف بس دول من غير أي إشارة إنه لازم يمرّر عشان يشوف التاريخ/الوقت/الموظف/الأوردر/الماكينة. الحاوية بقت <code>direction: ltr</code> صراحةً زي الجدول جواها</li>
         </ul>
       </div>
@@ -1314,7 +1324,7 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 // مصدر **واحد** لرقم نسخة الواجهة — بيتقرا منه زرار الهيدر وبادج الـ Changelog
 // ونص شاشة الدخول عن طريق renderVersionUI(). ممنوع كتابته hardcoded في أكتر
 // من مكان (٣ نصوص بتتزامن يدويًا = باج "الرقم متفرّق").
-const TOOL_VERSION = '3.3.1';
+const TOOL_VERSION = '3.3.2';
 
 // أقل نسخة Worker الواجهة دي بتشتغل معاها. v3.3.0 هي اللي ضافت
 // `get_logs_export` بعقد { cap, total, truncated } وفلاتر السجل كقوايم —
@@ -2862,9 +2872,15 @@ function renderLogTable() {
           ? `<span class="badge badge-warn" style="font-family:var(--font-mono);">[S-2]</span>`
           : `<span class="badge badge-neutral">—</span>`;
 
+    // ⚠️ ملاحظات الفشل/النجاح (`e.notes`) ممكن تبقى نص طويل (سبب الرفض كامل).
+    // لازم تتلف (`.reject-reason` — wrap + max-width) مش `.tracking-num`
+    // (مصمّمة لنص قصير أحادي السطر)، وإلا العمود ده لوحده بيوسّع الجدول
+    // كله لعرض هائل ويرجّع مشكلة السكرول الأفقي اللي اتصلحت في v3.3.1.
     const transition = (e.value_before || e.value_after)
       ? `<span class="tracking-num" style="font-size:12px;">${e.value_before || '—'} → ${e.value_after || '—'}</span>`
-      : `<span class="tracking-num" style="font-size:12px;">${e.notes || '—'}</span>`;
+      : e.notes
+        ? `<span class="reject-reason" style="color:${e.notes.startsWith('فشل') ? 'var(--red)' : 'var(--text-secondary)'};">${e.notes}</span>`
+        : `<span class="tracking-num" style="font-size:12px;">—</span>`;
 
     // السجلات الأقدم من v3.2.0 مالهاش extra.result — بتتعرض "—" مش "✓"،
     // لأننا مش عارفين إن كان الفعل تم وقتها.
