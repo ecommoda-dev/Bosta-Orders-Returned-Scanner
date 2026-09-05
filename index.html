@@ -266,7 +266,7 @@ body {
 .scan-chip-del:hover { color: var(--accent); }
 
 /* ── Table ── */
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; direction: ltr; }
 table { width: 100%; border-collapse: collapse; direction: ltr; }
 thead th { text-align: center; padding: 10px 14px; background: var(--surface-2); border-bottom: 2px solid var(--border); font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
 thead th.col-check { width: 38px; }
@@ -453,7 +453,7 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
   color: var(--amber); font-size: 13px; font-weight: 600; line-height: 1.7; }
 
 /* ── جدول السجل ── */
-.log-table-wrap { overflow-x: auto; }
+.log-table-wrap { overflow-x: auto; direction: ltr; }
 .log-table { width: 100%; border-collapse: collapse; direction: ltr; }
 .log-table thead th { text-align: center; padding: 9px 12px; background: var(--surface-2); border-bottom: 2px solid var(--border); font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
 .log-table thead th, .log-table tbody td { border-inline-start: 1px solid var(--border); }
@@ -1194,6 +1194,16 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
           <span class="cl-ver-date">05-09-2026</span>
         </div>
         <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>جدول السجل وجدول النتائج كانا بيفتحوا على آخر أعمدتهم بدل أولها</b> — الصفحة كلها RTL، بس الجدولين متعمول عليهم <code>direction: ltr</code> عشان ترتيب الأعمدة يفضل ثابت، وحاوية السكرول (<code>.table-wrap</code>/<code>.log-table-wrap</code>) كانت بترث الـ RTL من الصفحة من غير ما تتحدد. النتيجة: أول ما الجدول يبقى أعرض من الشاشة، السكرول الأفقي بيفتح افتراضيًا من اليمين البصري، اللي بيوافق آخر الأعمدة (التحديث/النتيجة/التتبع في السجل) — والموظف بيشوف بس دول من غير أي إشارة إنه لازم يمرّر عشان يشوف التاريخ/الوقت/الموظف/الأوردر/الماكينة. الحاوية بقت <code>direction: ltr</code> صراحةً زي الجدول جواها</li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.3.0</span>
+          <span class="cl-ver-date">05-09-2026</span>
+        </div>
+        <ul class="cl-items">
           <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>كل إلغاء ناجح كان بيطلع أصفر "مش مؤكَّد"</b> — <code>orderCancel</code> بترجّع Job، والتحقق كان بينام مدد ثابتة ويقرا الأوردر من غير ما يبص على الـ Job نفسه، فالقراءة بتسبق التأكيد. دلوقتي backoff متصاعد + فحص <code>job(id){ done }</code> مجمّع + وقوف على أول تأكيد، و<code>{ jobDone, attempts, waitedMs }</code> بترجع في الرد وفي السجل</li>
           <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>تصدير السجل كان بيتقص عند السقف في السكوت</b> — الأداة كانت بتقول "تم التصدير ✓" على ملف ناقص. دلوقتي فيه بانر ثابت فوق الجدول بالرقمين (المصدَّر / الإجمالي)، ورسالة النجاح بتظهر بس لو الملف كامل</li>
           <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>رقمين تتبع لنفس الأوردر</b> كانوا بيلغوه مرتين على لقطة حالة قديمة — التكرار بقى بيتخطى في نفس الدفعة برسالة واضحة</li>
@@ -1304,7 +1314,7 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 // مصدر **واحد** لرقم نسخة الواجهة — بيتقرا منه زرار الهيدر وبادج الـ Changelog
 // ونص شاشة الدخول عن طريق renderVersionUI(). ممنوع كتابته hardcoded في أكتر
 // من مكان (٣ نصوص بتتزامن يدويًا = باج "الرقم متفرّق").
-const TOOL_VERSION = '3.3.0';
+const TOOL_VERSION = '3.3.1';
 
 // أقل نسخة Worker الواجهة دي بتشتغل معاها. v3.3.0 هي اللي ضافت
 // `get_logs_export` بعقد { cap, total, truncated } وفلاتر السجل كقوايم —
