@@ -1489,7 +1489,7 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 // مصدر **واحد** لرقم نسخة الواجهة — بيتقرا منه زرار الهيدر وبادج الـ Changelog
 // ونص شاشة الدخول عن طريق renderVersionUI(). ممنوع كتابته hardcoded في أكتر
 // من مكان (٣ نصوص بتتزامن يدويًا = باج "الرقم متفرّق").
-const TOOL_VERSION = '3.3.2';
+const TOOL_VERSION = '3.4';
 
 // أقل نسخة Worker الواجهة دي بتشتغل معاها. v3.3.0 هي اللي ضافت
 // `get_logs_export` بعقد { cap, total, truncated } وفلاتر السجل كقوايم —
@@ -1497,7 +1497,7 @@ const TOOL_VERSION = '3.3.2';
 // ⚠️ مالهاش أي علاقة بـ TOOL_VERSION — دي بتوصف الصفحة، ودي بتوصف أقل Worker
 // مقبول. متزامنهمش. وأي endpoint/حقل جديد الصفحة تعتمد عليه ⇒ ارفعها في نفس
 // التسليم، وإلا الحارس بيرجع لوضع "مفيش حماية".
-const MIN_WORKER_VERSION = '3.3.0';
+const MIN_WORKER_VERSION = '3.4.0';   // v3.4.0 = أول Worker بيرجّع `already` وبيقبل rejected[] و sortBy
 let   workerVersion = null;
 
 // ── روابط الـ Workers — constants مش حقول إعدادات (Standards #28) ──
@@ -1601,6 +1601,22 @@ function formatTimeForExport(iso) {
 // ── §CONFIG::API Helpers ──
 // v3.2.0 — رسائل الفشل بقت تفرّق بين "الـ Worker رد بخطأ" و"مقدرناش نوصله أصلاً"
 // (CORS / URL غلط / الـ Worker واقع). الحالتين كانوا بيديّوا "Failed to fetch" غامضة.
+// ─── §CONFIG::esc — تهريب أي نص جاي من بره قبل ما يتحط في innerHTML ───
+// ⚠️ كل نص بيتعرض في الجداول جاي من بوسطة أو شوبيفاي أو رسالة خطأ من الـ Worker
+// — يعني من بره الصفحة. `<` واحدة في رسالة خطأ كانت بتكسر الجدول (أو تبلع باقي
+// الصف) من غير أي إشارة.
+function esc(v) {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ⚠️ مهلة صريحة على كل نداء. من غيرها الـ Worker الواقف بيسيب الزرار معطّل
+// و`spinner` بيلف للأبد، والموظف بيفتكر إن الأداة اتعلّقت فبيعمل refresh —
+// **وسط عملية إلغاء أوردرات**. المهلة طويلة عن قصد: دفعة كاملة بتاخد عشرات
+// الثواني، والقطع بدري أسوأ من الانتظار.
+const API_TIMEOUT_MS = 90000;
+
 async function apiRequest(url, opts) {
   let resp;
   const ctrl  = new AbortController();
@@ -2271,10 +2287,16 @@ function doLogout() {
 // Pattern: listener sets timeout only; handleScan reads + clears value
 let scanTimer;
 const scanInputEl = document.getElementById('scanInput');
+// ⚠️ v3.4 — المنطق القديم كان: `const gap = len > 3 ? 80 : 400;`
+//    ثم `setTimeout(handleScan, gap < 80 ? 150 : 400)`.
+//    `gap` قيمته ٨٠ أو ٤٠٠، فـ `gap < 80` **عمرها ما بتتحقق** — التأخير كان
+//    **دايمًا ٤٠٠ms** والمسار السريع ما اشتغلش ولا مرة. أثرين: انتظار ميت في
+//    كل سكان، ولو الموظف سكن أسرع من ٤٠٠ms الباركودين بيتلزقوا في رقم واحد
+//    (الـ input مابيتمسحش غير جوّه handleScan). حارس الطول تحت بيمسك ده.
 scanInputEl.addEventListener('input', () => {
   clearTimeout(scanTimer);
-  const gap = scanInputEl.value.length > 3 ? 80 : 400;
-  scanTimer = setTimeout(handleScan, gap < 80 ? 150 : 400);
+  const isBurst = scanInputEl.value.length > 3;
+  scanTimer = setTimeout(handleScan, isBurst ? 150 : 400);
 });
 
 function handleScan() {
@@ -2300,9 +2322,23 @@ function addManual() {
 let scannedNums = [];
 let resultsData = [];
 
+// ─── §SCAN::TN_LEN — حارس الطول ───
+// أرقام تتبع بوسطة بين ٨ و١٣ رقم. بيمسك الحالتين اللي بيحصلوا فعلاً: باركودين
+// اتلزقوا في رقم واحد، وباركود اتقرا نص قراية. من غيره الرقم الغلط كان بيدخل
+// القايمة ويرجع "غير موجود ببوسطة" — رسالة كاذبة على شحنة موجودة.
+const TN_MIN_LEN = 8, TN_MAX_LEN = 13;
+
 function addTrackingNumber(num) {
-  const clean = num.replace(/\D/g, '');
+  const clean = String(num).replace(/\D/g, '');
   if (!clean) { showToast('رقم التتبع يجب أن يحتوي على أرقام فقط', 'error'); playBeep('warn'); return; }
+  if (clean.length < TN_MIN_LEN || clean.length > TN_MAX_LEN) {
+    showToast(
+      `الرقم "${clean}" طوله ${clean.length} رقم — المتوقّع بين ${TN_MIN_LEN} و${TN_MAX_LEN}. `
+      + (clean.length > TN_MAX_LEN ? 'غالبًا اتسكن باركودين ورا بعض — اسكنهم تاني واحد واحد.'
+                                   : 'غالبًا الباركود اتقرا ناقص — اسكنه تاني.'),
+      'warning', 6000);
+    playBeep('warn'); return;
+  }
   if (scannedNums.includes(clean)) { showToast(`${clean} موجود بالفعل`, 'error'); playBeep('warn'); return; }
   scannedNums.push(clean);
   renderScanList();
@@ -2982,13 +3018,23 @@ async function startUpdate() {
 
     renderResults();
 
+    // ⚠️ الصف اللي اتوقف قبل التنفيذ بيرجع في **الاتنين**: في `results` (بحالته)
+    //    وفي `rejected` (لأنه اتسجّل هناك). جمع المصدرين على بعض كان بيعدّ نفس
+    //    الأوردر مرتين — أوردر واحد يطلّع "خلاص متعمل: 2". الصفوف اللي مصدرها
+    //    التوقف وقت التنفيذ (`stage === 'write'`) بتتشال من عدّادات المرفوض،
+    //    لأنها **متعدّة أصلاً** في `results`.
+    const rejectedFromLookup = rejectedRows.filter(r => r.stage !== 'write');
+
     const s  = allResults.filter(r => r.status === 'success').length;
     const w  = allResults.filter(r => r.status === 'warning').length;
     const f  = allResults.filter(r => r.status === 'error').length;
     const al = allResults.filter(r => r.status === 'already').length
-             + rejectedRows.filter(r => r.already).length;
-    const rejectedRealRows = rejectedRows.filter(r => !r.already);
-    const notLogged        = allResults.filter(r => r.logged === false).length;
+             + rejectedFromLookup.filter(r => r.already).length;
+    const rejectedRealRows = rejectedFromLookup.filter(r => !r.already);
+    // ⚠️ `notLogged` = "عملية تمّت على شوبيفاي ومفيش ليها سجل". الصف اللي ما
+    //    اتنفّذش (`already` أو توقف) بياخد حالة تسجيله من مسار المرفوض، فلو
+    //    اتعدّ هنا كان الملخّص هيقول "عملية تمّت" على أوردر ما حصلّوش حاجة.
+    const notLogged        = allResults.filter(r => r.executed && r.logged === false).length;
     const rejectedNotLogged = rejectedRows.filter(r => r.logged === false).length;
     const becameValid      = allRejected.filter(r => r.becameValid).length;
 
@@ -3007,10 +3053,12 @@ async function startUpdate() {
     if (w || rejectedRealRows.length) playBeep('warn');
 
     showUpdateResultModal({
-      total: items.length + rejectedRows.length,
+      // الإجمالي = اللي اتبعت للتنفيذ + المرفوض **من الاستعلام** بس (المرفوض
+      // من التوقف وقت التنفيذ متعدّ أصلاً جوّه `items`)
+      total: items.length + rejectedFromLookup.length,
       succeeded: s, warned: w, failed: f, already: al, notLogged,
       rejectedRows: rejectedRealRows,
-      alreadyRows:  rejectedRows.filter(r => r.already),
+      alreadyRows:  rejectedFromLookup.filter(r => r.already),
       becameValid, rejectedNotLogged,
     });
   } catch (err) {

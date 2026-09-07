@@ -1846,6 +1846,10 @@ async function handleUpdate(request, env) {
         orderName: rec.orderName,
         orderId:   rec.orderId,
         success:   false,
+        // ⚠️ `executed` بترجع للواجهة عشان تفرّق بين "عملية تمّت ومفيش ليها
+        //    سجل" و"صف اتوقف قبل أي تنفيذ" — الاتنين ممكن يبقى `logged:false`
+        //    والفرق بينهم هو كل المعنى.
+        executed:  false,
         status:    rec.already ? 'already' : 'error',
         already:   rec.already,
         machine:   rec.machine,
@@ -1941,6 +1945,7 @@ async function handleUpdate(request, env) {
       orderName:   rec.orderName,
       orderId:     rec.orderId,
       success:     status !== 'error',
+      executed:    true,                        // لمس شوبيفاي فعلاً
       status,                                   // success | warning | error
       machine:     rec.machine,
       field:       rec.field,
@@ -1998,6 +2003,8 @@ async function handleUpdate(request, env) {
       total: items.length, succeeded, warned, failed,
       // "خلاص اترجّع" عدّاد مستقل — لا نجاح ولا فشل
       already,
+      // ⚠️ "مرفوض" هنا **بيستثني** `already` — والعدّ ده لازم يفضل مطابق
+      //    لأداة الشحن، وإلا أي تقرير بيقرا الحقلين من الأداتين بيجمع تفاحتين.
       rejected:        rejectedResults.filter(r => !r.becameValid && !r.already).length,
       alreadyRejected: rejectedResults.filter(r =>  r.already).length,
       becameValid:     rejectedResults.filter(r =>  r.becameValid).length,
