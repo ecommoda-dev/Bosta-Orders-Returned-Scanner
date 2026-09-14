@@ -142,7 +142,8 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
 
 ## 🔴 الأداة دي بقت **كمان** صفحة في `Warehouse-Operations-Center` (10-09-2026)
 
-`index.html` بتاع الريبو ده اتحوّل لصفحة **`returned.html`** جوّه هب المخزن،
+`index.html` بتاع الريبو ده اتحوّل لصفحة **`bosta-returned.html`** جوّه هب المخزن
+(كانت `returned.html` لحد هب v1.24.1 · الاسم والملف اتغيّروا في v1.25.0)،
 بنفس نمط الطباعة والتغليف وحذف المنتج: الموظف بيدخل **مرة واحدة** من الشاشة
 الرئيسية للهب وبيتنقّل بين الأدوات من غير ما يدخل تاني.
 
@@ -156,7 +157,8 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
 | مفتاح السر | `bosta_returned_scanner_worker_secret` | **`warehouse_ops_worker_secret`** (سر المجموعة) |
 | `login`/`logout` في D1 | `bosta_return` | **`warehouse_ops_center`** |
 | **الأفعال في D1** | `metafields_change` + `extra.sourceTool` | **نفسها بالحرف — ما اتغيّرش أي حاجة** |
-| لون الـ `--accent` | **أحمر** (`#dc2626`) | **أزرق الهب** — الكتلة اتشالت |
+| اسم الأداة | سكانر أوردرات المرتجعات | **قسم مرتجعات بوسطة** (هب v1.25.0) |
+| لون الشاشة | **أحمر** (`--accent: #dc2626`) | **بني** (`--amber` · هب v1.25.0) — بقاعدة الأسبقية، و`--accent` ما اتلمستش |
 | الفحص الذاتي 🩺 | `runDiag()` محلية | `wocRunDiag()` من الـ shell |
 
 - 🔴 **`WORKER_SECRET` لازم يبقى قيمة مجموعة `warehouse_ops` → Promote.**
@@ -197,7 +199,7 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
   الرئيسية (`.woc-tool.tool-danger`). أحمر على **كل** الشاشة = لون بلا معنى.
 
 - ⚠️ **الأداة دي لسه منشورة وشغّالة بقرار** — نقطة رجوع طول التجربة الحيّة.
-- ⚠️ **أي إصلاح في `index.html` هنا لازم يتعمل في `returned.html` كمان** —
+- ⚠️ **أي إصلاح في `index.html` هنا لازم يتعمل في `bosta-returned.html` كمان** —
   الملفين **متطابقين في §TOOL-JS و§SCAN و§LOG-JS بالحرف**، والفرق الوحيد
   المقصود هو الـ chrome. ⛔ **إصلاح في واحد بس معناه إن الصفحتين يفترقوا في
   صمت** — نفس عيلة خطر R1.
@@ -301,12 +303,12 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
 ## مسائل مفتوحة
 
 - 🔴 **`WORKER_SECRET` = قيمة مجموعة `warehouse_ops` → Promote — حاجز
-  لـ`returned.html` في الهب.** فوق في قسم الدمج.
+  لـ`bosta-returned.html` في الهب.** فوق في قسم الدمج.
 - 🔴 **`runDiag()` في `index.html` بتاع الريبو ده لسه بترمي** — بتقرا
   `UI_VERSION` المش موجود، فالفحص الذاتي بيطلّع «فشل الفحص» بدل النتيجة
   **في كل مرة**. الإصلاح سطر واحد (`TOOL_VERSION` بدل `UI_VERSION`)، بس
   الأنضف إنه ياخد نفس معالجة الهب. فوق في قسم الدمج.
-- ⚠️ **`index.html` هنا و`returned.html` في الهب بقوا مصدرين لنفس المنطق** —
+- ⚠️ **`index.html` هنا و`bosta-returned.html` في الهب بقوا مصدرين لنفس المنطق** —
   فوق في قسم الدمج. أي إصلاح لازم يتعمل في الاتنين في نفس التمريرة، لحد ما
   الأداة المستقلة تتشال.
 - 🔴 **تسجيل `type = 'rejected'` في `ecommoda-constants` §7 — مطلوب من أحمد.**
