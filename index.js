@@ -5,6 +5,21 @@
 //                       (extra.sourceTool = "bosta_orders_returned_scanner" — see §CONSTANTS)
 //
 // ═══════════════════════════════════════════════════════════════════════════
+// v3.5.0 — §UPDATE::whereaboutsAfterWrite (قرار أحمد 15-09-2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// بعد نجاح تنفيذ RTO (إلغاء) أو مرتجع بعد التسليم (استرجاع مخزون)، الـ Worker
+// بقى بيكتب `custom.package_whereabouts_s1` أو `_s2` (حسب `v.machine`) بقيمة
+// `Warehouse` — الطرد الفعلي رجع المخزن وقت الاستلام (ecommoda-order-lifecycle
+// §17 · Rule 17). best-effort فوق تنفيذ تمّ فعلاً: فشله warning على الصف
+// (`extra.packageWhereabouts` في D1) مش rollback على الإلغاء أو الاسترجاع اللي
+// حصل فعلاً — نفس مبدأ `restock`/`cancel` بالحرف.
+// ⚠️ ده أول استخدام للحقل ده على قناة بوسطة — المهارة (order-lifecycle
+// §package-whereabouts.md §2) كانت بتوصفه محصور في مناديب/شو روم بس، وقرار
+// أحمد ده وسّع النطاق ليشمل بوسطة كمان. `Orders-Packing-Checker` (كتابة
+// `Warehouse` وقت التغليف) و`Bosta-Orders-Shipped-Scanner` (كتابة `Courier`
+// وقت التسليم لبوسطة) طرفان تلاتة من نفس القرار — راجع CLAUDE.md.
+//
+// ═══════════════════════════════════════════════════════════════════════════
 // v3.4.0 — "الأداة بتقول اللي حصل، والسجل بيقول الحقيقة" (07-09-2026)
 // ═══════════════════════════════════════════════════════════════════════════
 // مراجعة شاملة مدعومة بفحص D1 الحيّ. البند الحاكم:
@@ -126,7 +141,7 @@
 // ══════════════════════════════════════════════════════════════
 // §CONSTANTS
 // ══════════════════════════════════════════════════════════════
-const WORKER_VERSION   = '3.4.0';
+const WORKER_VERSION   = '3.5.0';
 const API_VERSION      = '2026-01';                          // صريح دايمًا — أبدًا "latest"
 const TOOL_NAME        = 'bosta_return';                     // login/logout D1 logging only — unchanged
 const SOURCE_TOOL      = 'bosta_orders_returned_scanner';    // used in extra.sourceTool for status-write logs
@@ -1712,6 +1727,7 @@ async function handleUpdate(request, env) {
       error:          null,
       restock:        null,
       cancel:         null,
+      whereabouts:    null,
       needsCancelVerify: false,
       startedAt:      new Date().toISOString(),
       executed:       false,      // وصل لمرحلة تنفيذ فعلي على شوبيفاي؟
@@ -1812,6 +1828,24 @@ async function handleUpdate(request, env) {
             rec.warnings.push(`ما قدرناش نتأكد من الاسترجاع بعد التنفيذ: ${e.message}`);
           }
         }
+      }
+
+      // ─── §UPDATE::whereaboutsAfterWrite ───
+      // عهدة الطرد (order-lifecycle §17 · Rule 17) — الطرد الفعلي رجع المخزن
+      // دلوقتي (RTO على S1 · مرتجع بعد التسليم على S2)، بغض النظر عن نوع
+      // الشحنة اللي رجعته (بوسطة أو مندوب). best-effort فوق كتابة/إلغاء تمّ
+      // فعلاً — فشله warning على الصف، مش rollback على الإلغاء أو الاسترجاع.
+      // ⚠️ قرار أحمد 15-09-2026 وسّع الحقل ده ليشمل قناة بوسطة، بعد ما كان
+      // محصور في مناديب/شو روم بس (order-lifecycle §17 §2).
+      const whereaboutsKey = v.machine === 'S1' ? 'package_whereabouts_s1' : 'package_whereabouts_s2';
+      rec.whereabouts = { key: whereaboutsKey, value: 'Warehouse', written: false, error: null };
+      try {
+        await writeSingleMetafield(env, token, sOrder.orderGid, whereaboutsKey, rec.whereabouts.value);
+        rec.whereabouts.written = true;
+        rec.actions.push(`عهدة الطرد: ${whereaboutsKey} = ${rec.whereabouts.value}`);
+      } catch (e) {
+        rec.whereabouts.error = e.message;
+        rec.warnings.push(`عهدة الطرد (${whereaboutsKey}) ما اتكتبتش: ${e.message}`);
       }
     } catch (err) {
       // ⚠️ الرسالة بتوصل للموظف في المخزن — الترجمة بتضيف الشرح العربي
@@ -1931,6 +1965,7 @@ async function handleUpdate(request, env) {
             warnings:       rec.warnings,
             restock:        rec.restock,
             cancel:         rec.cancel,
+            packageWhereabouts: rec.whereabouts,
           },
         });
       } catch (e) {
@@ -1955,6 +1990,7 @@ async function handleUpdate(request, env) {
       warnings:    rec.warnings,
       error:       rec.error,
       restock:     rec.restock,
+      packageWhereabouts: rec.whereabouts,
       cancel:      rec.cancel ? {
         verified:       rec.cancel.verified,
         restockedUnits: rec.cancel.restockedUnits,
