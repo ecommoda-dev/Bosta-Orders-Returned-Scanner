@@ -6,9 +6,10 @@
 
 **بتعمل إيه:** الموظف بيمسح تراكينج نمبر بوسطة لأوردرات راجعة (RTO أو مرتجع بعد
 التسليم)، والأداة بتتحقق من الحالة على شوبيفاي وتحدّث ميتافيلد S1/S2 + تلغي
-الأوردر (مسار RTO) أو تسترجع القطع للمخزون (مسار مرتجع بعد التسليم).
+الأوردر (مسار RTO) أو تسترجع القطع للمخزون (مسار مرتجع بعد التسليم) **+ تحدّث
+عهدة الطرد لـ `Warehouse` (v3.5.0)**.
 **مين بيستخدمها:** مخزن (استلام المرتجعات).
-**الإصدار:** Worker `v3.4.0` · الواجهة `v3.4`
+**الإصدار:** Worker `v3.5.0` · الواجهة `v3.4`
 
 ## الروابط
 
@@ -26,7 +27,7 @@
 | `get_config` | نسخة الـ Worker + وقت السيرفر — لمطابقة نسخة الواجهة |
 | `diag` | فحص ذاتي كامل (env · CORS · D1 · شوبيفاي + الصلاحيات · LOCATION_ID · بوسطة) — صفر كتابة |
 | `lookup` | بحث بوسطة بالتراكينج + فحص شوبيفاي (S1/S2/returnStatus) + التحقق من صلاحية الانتقال — بدون كتابة |
-| `update` | تنفيذ فعلي: إلغاء الأوردر (RTO) أو استرجاع مخزون (مرتجع بعد التسليم) + تحقق بعد التنفيذ + D1 log · وبياخد كمان `rejected[]` فبيسجّلها بـ `type = 'rejected'` **من غير أي تنفيذ** (v3.4.0) |
+| `update` | تنفيذ فعلي: إلغاء الأوردر (RTO) أو استرجاع مخزون (مرتجع بعد التسليم) **+ `package_whereabouts_s1`/`_s2` = `Warehouse` (v3.5.0 · §WHEREABOUTS)** + تحقق بعد التنفيذ + D1 log · وبياخد كمان `rejected[]` فبيسجّلها بـ `type = 'rejected'` **من غير أي تنفيذ** (v3.4.0) |
 | `get_logs` / `get_logs_count` | تاب السجل — فلترة server-side بقوايم (`employees` · `results` · `machines`) + `search` + `dateFrom`/`dateTo` + **ترتيب server-side** (`sortBy`/`sortDir` بقائمة بيضاء)، صفحة ١٠٠ صف |
 | `get_logs_export` | التصدير — بيرجّع `{ entries, cap, total, truncated }`، مش الصفوف لوحدها |
 
@@ -207,6 +208,45 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
   (٦٣ بند)، وفيه بنود بتقفل **نص نافذة التأكيد** («هيتلغي نهائيًا» ·
   «مفيش رجوع فيه» · بالعدد) مش وجود النافذة. الريبو ده مالوش فحص متصفح.
 
+## 🔴 §WHEREABOUTS — عهدة الطرد (v3.5.0 · قرار أحمد 15-09-2026)
+
+> ⚠️ **تعديل Worker — Promote مطلوب.** `WORKER_VERSION` بقى `3.5.0`.
+> صفر ترفيع لأي حد أدنى نسخة في واجهة — الحقل ده كتابة سيرفر-سايد
+> best-effort، مفيش واجهة (هنا ولا في الهب) بتقرا `packageWhereabouts` من
+> الرد دلوقتي.
+
+بعد نجاح تنفيذ RTO (إلغاء) أو مرتجع بعد التسليم (استرجاع مخزون)، `handleUpdate`
+بقى بيكتب `custom.package_whereabouts_s1` (لو `v.machine = S1`، مسار RTO) أو
+`_s2` (لو `S2`، مسار المرتجع بعد التسليم) بقيمة **`Warehouse`** — الطرد الفعلي
+رجع المخزن وقت الاستلام (`ecommoda-order-lifecycle` §17 · Rule 17 ·
+`package-whereabouts.md`).
+
+- 🔴 **ده أول استخدام للحقل ده على قناة بوسطة — وده تعارض مباشر مع نص
+  المهارة الحالي.** `package-whereabouts.md` §2 بتستبعد `custom.zone =
+  Other_Regions` (بوسطة) صراحةً من نطاق الحقل ده. **قرار أحمد 15-09-2026
+  وسّع النطاق** ليشمل بوسطة كمان — الحقل بقى بيتكتب على **كل** أوردر بيتستلم
+  مرتجعه من الأداة دي، بغض النظر عن `custom.zone`/`custom.courier`.
+  ⚠️ **الثمن اللي لازم يتقال:** المهارة نفسها لسه بتوصف النطاق القديم؛
+  تحديثها مطلوب في جلسة تحديث مهارات منفصلة (تحت في المسائل المفتوحة).
+- 🔴 **الكتابة بعد آخر خطوة في المسار الأساسي (S1 أو S2) — وقبل الـ `catch`
+  الخارجي بالحرف.** لو `orderCancel` أو `writeSingleMetafield` أو
+  `disposeReturns` رمى، الاستثناء بيوصل للـ `catch` ورك `rec.error` بيتسجّل
+  — وكود عهدة الطرد **مايتنفّذش أصلاً**، فمفيش كتابة عهدة على عملية فشلت.
+  فشل الكتابة *بعد* نجاح المسار الأساسي بيتحوّل لـ `warnings[]` **مش
+  `rec.error`** — نفس مبدأ `restock`/`cancel` بالحرف: الإلغاء أو الاسترجاع
+  حصل فعلاً ومفيش طريقة تتراجع عنه، وحجب الصف عشان فشل حقل تتبّع ثانوي كان
+  هيبقى كذب.
+- ⚠️ **الكتابة بتحصل فورًا مع السكانة — مش بعد `verifyCancels`.** الموظف
+  ماسك الطرد فعليًا وقت السكان، فالفعل الفعلي (الطرد رجع المخزن) حصل بغض
+  النظر عن تأكيد الـ Job غير المتزامن بتاع `orderCancel`. الانتظار للتحقق
+  المجمّع كان هيأخّر كتابة حقيقة حصلت فعلاً.
+- ⚠️ **`rec.whereabouts` (`{ key, value, written, error }`) بيترجع في كل
+  صف من `results[]`** وبيتسجّل جوّه `extra.packageWhereabouts` في D1 —
+  للتشخيص لو حد سأل «ليه الحقل ده فاضي على أوردر معيّن؟».
+- ⚠️ **الطرف التلاتة من نفس القرار:** `Orders-Packing-Checker` بيكتب
+  `Warehouse` وقت التغليف، و`Bosta-Orders-Shipped-Scanner` بيكتب `Courier`
+  وقت التسليم لبوسطة — راجع `CLAUDE.md` بتوعهم.
+
 ## فخاخ الأداة دي
 
 - **`reverseFulfillmentOrderDispose`/`orderCancel` وأخواتهم بيرجّعوا نجاح شكلي
@@ -286,11 +326,12 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
 | ecommoda-worker-builder | v2.1.0 |
 | ecommoda-html-builder | v6.6.0 |
 | ecommoda-constants | v1.10.0 |
-| ecommoda-order-lifecycle | v1.2.0 |
+| ecommoda-order-lifecycle | v1.8.0 (§WHEREABOUTS — راجع بند مفتوح تحت) |
 | shopify-graphql-helper | v1.0.0 |
 
-آخر مطابقة: 10-09-2026 · `index.js` v3.4.0 · `index.html` v3.4
-🔴 معلّقة: **`WORKER_SECRET` = سر مجموعة `warehouse_ops` → Promote** (حاجز
+آخر مطابقة: 15-09-2026 · `index.js` v3.5.0 · `index.html` v3.4
+🔴 معلّقة: **Promote لـ v3.5.0** (حاجز لكتابة عهدة الطرد — §WHEREABOUTS) ·
+**`WORKER_SECRET` = سر مجموعة `warehouse_ops` → Promote** (حاجز
 لصفحة `returned.html` في الهب) · **`runDiag()` بترمي على `UI_VERSION`**
 
 > `shopify-graphql-helper` و`ecommoda-order-lifecycle` اتضافوا للجدول 05-09-2026:
@@ -302,6 +343,17 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
 
 ## مسائل مفتوحة
 
+- 🔴 **Promote لـ v3.5.0 — حاجز لكتابة عهدة الطرد (جديد).** من غيره
+  `custom.package_whereabouts_s1`/`_s2` مش بيتكتب على أي أوردر بيتستلم
+  مرتجعه من هنا، والفشل **صامت بالكامل** لأن الكتابة نفسها best-effort
+  (§WHEREABOUTS فوق) — الصف بيرجع بحالته الحقيقية (نجاح/تحذير) عادي وبس
+  عهدة الطرد ما بتتكتبش.
+- 🔴 **تحديث `ecommoda-order-lifecycle` → `package-whereabouts.md` §2 —
+  مطلوب من أحمد في جلسة تحديث مهارات منفصلة.** المهارة لسه بتستبعد
+  `Other_Regions` (بوسطة) صراحةً من نطاق الحقل ده، وقرار أحمد 15-09-2026
+  وسّع النطاق ليشمل بوسطة كمان — راجع §WHEREABOUTS فوق والقرار المتطابق في
+  `Orders-Packing-Checker` و`Bosta-Orders-Shipped-Scanner`. لحد ما المهارة
+  تتحدّث، **الكود هنا هو مصدر الحقيقة الفعلي، والمهارة نص متأخر عن قرار حي.**
 - 🔴 **`WORKER_SECRET` = قيمة مجموعة `warehouse_ops` → Promote — حاجز
   لـ`bosta-returned.html` في الهب.** فوق في قسم الدمج.
 - 🔴 **`runDiag()` في `index.html` بتاع الريبو ده لسه بترمي** — بتقرا
@@ -422,7 +474,7 @@ SELECT type, json_extract(extra,'$.result') AS res, COUNT(*) n, MAX(timestamp) l
 > تحت `update` معناه **فشل حقيقي أثناء التنفيذ** ويستاهل تحقيق فوري.
 > و`rejected`/`already` بيظهر — ده صحّي، دي الحالات اللي كانت بتتسجّل فشل.
 
-آخر تحديث: 07-09-2026 — 18:30
+آخر تحديث: 15-09-2026 — v3.5.0 (§WHEREABOUTS — كتابة `package_whereabouts_s1`/`_s2 = Warehouse` بعد نجاح الإلغاء/الاسترجاع)
 
 
 </div>
