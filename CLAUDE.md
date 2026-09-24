@@ -323,14 +323,15 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
 
 | المهارة | الإصدار وقت آخر تعديل |
 |---|---|
-| ecommoda-worker-builder | v2.1.0 |
+| ecommoda-worker-builder | v3.7.1 |
 | ecommoda-html-builder | v6.6.0 |
-| ecommoda-constants | v1.10.0 |
+| ecommoda-constants | v3.1.0 |
 | ecommoda-order-lifecycle | v1.8.0 (§WHEREABOUTS — راجع بند مفتوح تحت) |
 | shopify-graphql-helper | v1.0.0 |
 
-آخر مطابقة: 15-09-2026 · `index.js` v3.5.0 · `index.html` v3.4
-🔴 معلّقة: **Promote لـ v3.5.0** (حاجز لكتابة عهدة الطرد — §WHEREABOUTS) ·
+آخر مطابقة: 24-09-2026 · `index.js` v3.5.1 · `index.html` v3.4
+🔴 معلّقة: **Promote لـ v3.5.1** (حاجز لتفعيل الحارس الديناميكي لقيم اللوج —
+§LOG-REG تحت) · **Promote لـ v3.5.0** (حاجز لكتابة عهدة الطرد — §WHEREABOUTS) ·
 **`WORKER_SECRET` = سر مجموعة `warehouse_ops` → Promote** (حاجز
 لصفحة `returned.html` في الهب) · **`runDiag()` بترمي على `UI_VERSION`**
 
@@ -473,6 +474,30 @@ SELECT type, json_extract(extra,'$.result') AS res, COUNT(*) n, MAX(timestamp) l
 > **يقرب من صفر** (قبل الإصلاح كان ٦١ صف، ٥٩ منهم كذّابين). أي `error` جديد
 > تحت `update` معناه **فشل حقيقي أثناء التنفيذ** ويستاهل تحقيق فوري.
 > و`rejected`/`already` بيظهر — ده صحّي، دي الحالات اللي كانت بتتسجّل فشل.
+
+## §LOG-REG — الحارس الديناميكي لقيم اللوج (v3.5.1 · ecommoda-worker-builder Step 7-ج)
+
+> ⚠️ **تعديل Worker — Promote مطلوب.** `WORKER_VERSION` بقى `3.5.1`. مراقبة
+> بس — صفر تعديل منطق تشغيلي.
+
+`check-log-values.mjs` اتستبدل بنسخة بتمسك **object shorthand** (`{ tool, type }`)
+جوّه نداءات الكتابة — النسخة القديمة كانت بتدوّر على `type:` بنقطتين بس فبتعدّي
+الشكل ده في صمت. الجرد بالنسخة المصلَّحة على هذا الريبو رجع **نضيف**: الأداة
+مالهاش أي `{ tool, type }` shorthand ولا قيمة `type` بتتحسب وقت التشغيل —
+الأربع قيم كلها (`login` · `logout` · `update` · `rejected`) نص ثابت صريح.
+
+`log-values.json` اتحدّث ليضيف `"tool": "metafields_change"` على `update` و
+`rejected` — القيمتين دول بيتكتبوا تحت `tool = 'metafields_change'` (السجل
+المشترك) مش تحت `bosta_return`، وده كان ناقص من التسجيل قبل كده.
+
+`writeLog` (جوّه §SHARED) بقى بيقارن الزوج `(tool, type)` بـ `LOG_REGISTRY`
+(§LOG-REG في الكود، فوق §SHARED مباشرة). الزوج مش مسجّل → الصف بيتكتب **عادي**
++ `extra._unregistered = true` + UPSERT صامت في `log_value_alerts` — **مفيش
+رفض كتابة أبدًا**. الجدول مشترك على مستوى الستاك ومفروض موجود خلاص، فمفيش
+`CREATE TABLE` في الكود ده.
+
+آخر تحديث: 24-09-2026 — v3.5.1 (§LOG-REG — الحارس الديناميكي لقيم اللوج +
+استبدال `check-log-values.mjs` بالنسخة اللي بتمسك object shorthand)
 
 آخر تحديث: 15-09-2026 — v3.5.0 (§WHEREABOUTS — كتابة `package_whereabouts_s1`/`_s2 = Warehouse` بعد نجاح الإلغاء/الاسترجاع)
 

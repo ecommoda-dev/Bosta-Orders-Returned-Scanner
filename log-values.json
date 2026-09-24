@@ -1,6 +1,6 @@
 {
   "tool": "bosta_return",
-  "since": null,
+  "since": "index.js v3.5.1",
   "types": {
     "login": {
       "result": null,
@@ -13,15 +13,24 @@
       "desc": "خروج موظف"
     },
     "rejected": {
+      "tool": "metafields_change",
       "result": [
         "already",
         "rejected"
       ],
-      "stage": null,
+      "stage": [
+        "lookup",
+        "write"
+      ],
       "desc": "المسح اترفض — الانتقال ممنوع أو الحالة المستهدفة موجودة أصلاً"
     },
     "update": {
-      "result": null,
+      "tool": "metafields_change",
+      "result": [
+        "success",
+        "warning",
+        "error"
+      ],
       "stage": null,
       "desc": "تحديث ميتافيلد حالة الأوردر بعد مسح شحنة مرتجعة"
     }
