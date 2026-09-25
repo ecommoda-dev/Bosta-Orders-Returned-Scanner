@@ -143,7 +143,7 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
 
 ## 🔴 الأداة دي بقت **كمان** صفحة في `Warehouse-Operations-Center` (10-09-2026)
 
-`index.html` بتاع الريبو ده اتحوّل لصفحة **`bosta-returned.html`** جوّه هب المخزن
+`index.html` بتاع الريبو ده اتحوّل لصفحة **`Bosta-Orders-Returned-Scanner.html`** جوّه هب المخزن
 (كانت `returned.html` لحد هب v1.24.1 · الاسم والملف اتغيّروا في v1.25.0)،
 بنفس نمط الطباعة والتغليف وحذف المنتج: الموظف بيدخل **مرة واحدة** من الشاشة
 الرئيسية للهب وبيتنقّل بين الأدوات من غير ما يدخل تاني.
@@ -200,7 +200,7 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
   الرئيسية (`.woc-tool.tool-danger`). أحمر على **كل** الشاشة = لون بلا معنى.
 
 - ⚠️ **الأداة دي لسه منشورة وشغّالة بقرار** — نقطة رجوع طول التجربة الحيّة.
-- ⚠️ **أي إصلاح في `index.html` هنا لازم يتعمل في `bosta-returned.html` كمان** —
+- ⚠️ **أي إصلاح في `index.html` هنا لازم يتعمل في `Bosta-Orders-Returned-Scanner.html` كمان** —
   الملفين **متطابقين في §TOOL-JS و§SCAN و§LOG-JS بالحرف**، والفرق الوحيد
   المقصود هو الـ chrome. ⛔ **إصلاح في واحد بس معناه إن الصفحتين يفترقوا في
   صمت** — نفس عيلة خطر R1.
@@ -356,12 +356,12 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
   `Orders-Packing-Checker` و`Bosta-Orders-Shipped-Scanner`. لحد ما المهارة
   تتحدّث، **الكود هنا هو مصدر الحقيقة الفعلي، والمهارة نص متأخر عن قرار حي.**
 - 🔴 **`WORKER_SECRET` = قيمة مجموعة `warehouse_ops` → Promote — حاجز
-  لـ`bosta-returned.html` في الهب.** فوق في قسم الدمج.
+  لـ`Bosta-Orders-Returned-Scanner.html` في الهب.** فوق في قسم الدمج.
 - 🔴 **`runDiag()` في `index.html` بتاع الريبو ده لسه بترمي** — بتقرا
   `UI_VERSION` المش موجود، فالفحص الذاتي بيطلّع «فشل الفحص» بدل النتيجة
   **في كل مرة**. الإصلاح سطر واحد (`TOOL_VERSION` بدل `UI_VERSION`)، بس
   الأنضف إنه ياخد نفس معالجة الهب. فوق في قسم الدمج.
-- ⚠️ **`index.html` هنا و`bosta-returned.html` في الهب بقوا مصدرين لنفس المنطق** —
+- ⚠️ **`index.html` هنا و`Bosta-Orders-Returned-Scanner.html` في الهب بقوا مصدرين لنفس المنطق** —
   فوق في قسم الدمج. أي إصلاح لازم يتعمل في الاتنين في نفس التمريرة، لحد ما
   الأداة المستقلة تتشال.
 - 🔴 **تسجيل `type = 'rejected'` في `ecommoda-constants` §7 — مطلوب من أحمد.**
@@ -496,7 +496,13 @@ SELECT type, json_extract(extra,'$.result') AS res, COUNT(*) n, MAX(timestamp) l
 رفض كتابة أبدًا**. الجدول مشترك على مستوى الستاك ومفروض موجود خلاص، فمفيش
 `CREATE TABLE` في الكود ده.
 
-آخر تحديث: 24-09-2026 — v3.5.1 (§LOG-REG — الحارس الديناميكي لقيم اللوج +
+آخر تحديث: 25-09-2026 — **صفحة الهب اتسمّت تاني.** رابط الصفحة جوّه
+`Warehouse-Operations-Center` بقى `Bosta-Orders-Returned-Scanner.html` بدل
+`bosta-returned.html` — قاعدة جديدة هناك: رابط أي أداة مدمجة يتاخد بالنص من
+اسم ريبو الـ Worker بتاعها. صفر تعديل هنا (`index.js` و`index.html` ما
+اتلمسوش) — تحديث توثيقي بحت.
+
+24-09-2026 — v3.5.1 (§LOG-REG — الحارس الديناميكي لقيم اللوج +
 استبدال `check-log-values.mjs` بالنسخة اللي بتمسك object shorthand)
 
 آخر تحديث: 15-09-2026 — v3.5.0 (§WHEREABOUTS — كتابة `package_whereabouts_s1`/`_s2 = Warehouse` بعد نجاح الإلغاء/الاسترجاع)
