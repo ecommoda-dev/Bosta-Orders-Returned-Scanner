@@ -32,8 +32,8 @@
 
   /* Text */
   --text-primary:   #111827;
-  --text-secondary: #6b7280;
-  --text-muted:     #9ca3af;
+  --text-secondary: #4b5563;   /* v8.1.0 · Standards #48 — كان #6b7280 */
+  --text-muted:     #4b5563;
   --text-mid:       #374151;
 
   /* Accent — أحمر (الاستثناء المعتمد لأداة المرتجعات) */
@@ -251,7 +251,6 @@ body {
   font-family: var(--font-mono); direction: ltr; text-align: left;
 }
 .scanner-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(220,38,38,.12); }
-.scanner-input::placeholder { color: var(--text-muted); font-family: var(--font-body); }
 
 /* ── Counter badge ── */
 .counter-badge { display: flex; align-items: center; gap: 6px; background: var(--accent); border-radius: 8px; padding: 6px 12px; }
@@ -442,10 +441,12 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 .results-count { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 34px;
   padding: 0 10px; font-family: var(--font-mono); font-size: 17px; font-weight: 800;
   color: var(--purple); background: var(--purple-light); border: 1.5px solid var(--purple-border); border-radius: var(--radius-sm); }
-/* ⚠️ العيّنة في المرجع بتحط max-height:1000px — بيقص صفحة سجل من ١٠٠ صف
-   (≈٣٦٠٠px). الرقم هنا أوسع من أي صفحة ممكنة عشان الطي يشتغل بلا قص. */
-.tbl-body-wrap { max-height: 20000px; overflow: hidden; transition: max-height .3s ease; border-radius: 0 0 var(--radius) var(--radius); }
-.tbl-body-wrap.collapsed { max-height: 0; }
+/* Standards #46 (v8.0.0) — grid بدل سقف max-height رقمي: الارتفاع auto فعليًا،
+   فمفيش رقم يتخطّاه أي محتوى (السقف الرقمي كان بيقص صفوف السجل بصمت). */
+.tbl-body-wrap { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr; transition: grid-template-rows .3s ease; border-radius: 0 0 var(--radius) var(--radius); }
+.tbl-body-wrap > * { min-height: 0; }
+.tbl-body-wrap.collapsed { grid-template-rows: 0fr; overflow: hidden; }
+.tbl-body-wrap.collapsed > * { overflow: hidden; }
 
 /* ── بانر التصدير المقصوص — ثابت فوق الجدول، مش توست بيختفي (Standards #30) ── */
 .export-warn { margin: 0 0 12px; padding: 10px 14px; border-radius: 9px;
@@ -535,6 +536,38 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 }
 .recheck-banner ul { margin: 6px 0 0; padding-inline-start: 20px; }
 .recheck-banner li { margin-bottom: 3px; }
+
+/* ── Idle logout (§IDLE-JS) — banner + login notice · Standards #52 ── */
+.idle-warn {
+  display: none; position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 9000;               /* فوق كل الـ modals (600) وتحت الـ toast (9999) */
+  width: min(92vw, 440px);
+  background: var(--amber-light); border: 1px solid var(--amber-border); color: var(--amber-dark);
+  border-radius: 12px; padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.18);
+  text-align: center; line-height: 1.7; font-weight: 800; font-size: 13px;
+}
+.idle-warn.visible { display: block; }
+.idle-warn .idle-ask { font-weight: 900; font-size: 14px; }
+.idle-warn button {
+  margin-top: 8px; min-height: 44px; padding: 0 22px; border: none; border-radius: 10px;
+  background: var(--accent); color: var(--on-accent);
+  font-family: var(--font-body); font-size: 14px; font-weight: 900; cursor: pointer;
+}
+.login-notice {
+  display: none; border-radius: 10px; border: 1px solid var(--amber-border);
+  background: var(--amber-light); color: var(--amber-dark);
+  padding: 9px 12px; font-size: 12px; font-weight: 800; text-align: center; line-height: 1.6;
+}
+.login-notice.visible { display: block; }
+
+/* ── §TOOL::rq — طابور «راجع من بوسطة» (v3.5) ── */
+.rq-sub   { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.rq-fail  { margin: 12px 18px 0; padding: 10px 14px; border-radius: 9px; background: var(--red-light); border: 1px solid var(--red-border); color: var(--red); font-size: 13px; font-weight: 600; line-height: 1.7; }
+.rq-warn  { margin: 12px 18px 0; padding: 10px 14px; border-radius: 9px; background: var(--amber-light); border: 1px solid var(--amber-border); color: var(--amber); font-size: 13px; font-weight: 600; line-height: 1.7; }
+.rq-stamp { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.rq-age   { margin-inline-start: 6px; font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.rq-age.late { color: var(--amber); }
+#rqBody td.rq-cust { white-space: normal; max-width: 180px; }
 
 /* ── v3.4 — نافذة التأكيد قبل فعل لا رجعة فيه ── */
 .confirm-modal { border-top: 4px solid var(--red); }
@@ -704,6 +737,13 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 <!-- ══════════════════════════════════════════════════════
      §LOGIN — شاشة الدخول (خطوتان — الـ PIN مخفي لحد اختيار الاسم)
      ══════════════════════════════════════════════════════ -->
+<!-- Idle warning banner — §IDLE-JS (z-index 9000). النص بيتملا من JS. -->
+<div class="idle-warn" id="idleWarn" role="alert">
+  <div id="idleWarnText"></div>
+  <div class="idle-ask" id="idleWarnAsk"></div>
+  <button type="button" onclick="idleStay()">أنا موجود</button>
+</div>
+
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
 
@@ -721,6 +761,8 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
     </div>
 
     <div class="login-body">
+
+      <div class="login-notice" id="loginNotice"></div>
 
       <div class="login-field">
         <!-- ⚠️ الـ <label> اتشال بالكامل والإرشاد بقى في الـ placeholder بس
@@ -842,7 +884,7 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
             class="scanner-input"
             type="text"
             inputmode="numeric"
-            placeholder="امسح الباركود أو اكتب رقم التتبع..."
+            aria-label="امسح الباركود أو اكتب رقم التتبع"
             autocomplete="off"
           />
           <button class="btn btn-outline" onclick="addManual()">يدوي</button>
@@ -850,6 +892,50 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
         <div id="scanList">
           <div class="empty-state"><div class="icon">🔍</div><div>لم يتم مسح أي أرقام بعد</div></div>
         </div>
+      </div>
+    </div>
+
+    <!-- ══ §TOOL::rq — طابور «راجع من بوسطة» ══
+         الأوردرات اللي بوسطة بتردّها فعلاً: المندوب Bosta + الحالة In-Return (S1 أو S2)
+         + ميتافيلد الـ webhook = «41 · Out For Return». الحكم كله في الـ Worker
+         (`get_ready_to_return`) والصفحة بتعرض اللي راجع بالحرف.
+         ⛔ عرض بحت — مش حارس: أوردر مش هنا لسه بيتسكن والـ Worker هو اللي بيحكم. -->
+    <div class="card" id="rqCard" style="margin-top:16px;">
+      <div class="card-header">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <div>
+            <h2>📦 راجع من بوسطة</h2>
+            <div class="rq-sub">مندوبه بوسطة · In-Return · حالة بوسطة <bdi dir="ltr">41 · Out For Return</bdi></div>
+          </div>
+          <div class="counter-badge">
+            <span class="num" id="rqCount">—</span>
+            <span class="lbl">أوردر</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span class="rq-stamp" id="rqStamp"></span>
+          <button class="btn btn-outline btn-sm" id="rqRefreshBtn" onclick="rqLoad(false)">↻ تحديث</button>
+        </div>
+      </div>
+      <div id="rqFail" class="rq-fail" style="display:none;"></div>
+      <div id="rqTrunc" class="rq-warn" style="display:none;"></div>
+      <div id="rqEmpty" class="empty-state"><div class="icon">⏳</div><div>جاري الاستعلام عن الأوردرات برجاء الانتظار ...</div></div>
+      <div class="table-wrap" id="rqTableWrap" style="display:none;">
+        <table>
+          <thead>
+            <tr>
+              <th>رقم الأوردر</th>
+              <th>العميل</th>
+              <th>رقم التتبع</th>
+              <th>نوع الراجع</th>
+              <th>حالة بوسطة</th>
+              <th>آخر تحديث من بوسطة</th>
+              <th>تاريخ الأوردر</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody id="rqBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -1207,6 +1293,7 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
           <h4>الـ Endpoints الرئيسية</h4>
           <table>
             <tr><th>action</th><th>الوصف</th></tr>
+            <tr><td><code>get_ready_to_return</code></td><td><b>جديد v3.6.0</b> — طابور «راجع من بوسطة»: مندوبه Bosta + <code>In-Return</code> (S1 أو S2) + ميتافيلد الـ webhook = <code>41 · Out For Return</code>. قراءة بحتة، والحكم كله في الـ Worker</td></tr>
             <tr><td><code>lookup</code></td><td>بوسطة + شوبيفاي (S1/S2/returnStatus) + التحقق من الانتقال</td></tr>
             <tr><td><code>update</code></td><td>إعادة تحقق دفاعي، ثم لكل أوردر لوحده: (RTO) <code>orderCancel</code> → <code>metafieldsSet</code> | (مرتجع بعد التسليم) <code>metafieldsSet</code> → <code>reverseFulfillmentOrderDispose</code> + D1 log. وبياخد كمان <code>rejected[]</code> فيسجّلها بنوع <code>rejected</code> <b>من غير أي تنفيذ</b></td></tr>
             <tr><td><code>diag</code></td><td><b>جديد v3.2.0</b> — فحص ذاتي بدون أي كتابة: متغيرات الـ Worker وأسماؤها، صلاحيات تطبيق شوبيفاي (<code>write_returns</code>…)، الـ LOCATION_ID، بوسطة، D1، والـ Origin</td></tr>
@@ -1236,6 +1323,8 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
             <li><code>§CONFIG</code> — <code>TOOL_VERSION</code> · <code>MIN_WORKER_VERSION</code> · روابط الـ Workers كـ constants · <code>apiGet</code>/<code>apiPost</code> · صيغ التاريخ الموحّدة</li>
             <li><code>§DIAG-JS</code> — زرار الفحص الذاتي (<code>?action=diag</code>) في الإعدادات</li>
             <li><code>§SCAN</code> — سكانر جن + إضافة يدوية لأرقام التتبع</li>
+            <li><code>§RQ-JS</code> — طابور «راجع من بوسطة» (<code>rqLoad</code> · <code>rqRender</code> · <code>rqAddRow</code>): عرض بحت بصفر فلترة محلية، وبيجيب عند الدخول وعند «↻ تحديث» بس</li>
+            <li><code>§IDLE-JS</code> — خروج تلقائي بعد ٦٠ دقيقة عدم نشاط (وقت فعلي · بانر تحذير · واقف أثناء الدفعة) · <code>performLogout(reason)</code></li>
             <li><code>§TOOL-JS</code> — <code>lookup</code> · جدول النتائج · <code>startUpdate</code> (٣ حالات) · تصدير النتائج</li>
             <li><code>§LOG-JS</code> — تاب السجل: القسم الموحّد (فلاتر multi-select + مدى تاريخ + ترتيب ٣ حالات + صف النتائج) و pagination وتصدير XLSX ببانر التقصّ</li>
           </ul>
@@ -1335,6 +1424,20 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
       <div class="cl-version-block">
         <div class="cl-version-row">
           <span class="cl-ver-badge" id="clLatestBadge">v—</span>
+          <span class="cl-ver-date">25-10-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag new">جديد</span> <b>طابور «📦 راجع من بوسطة»</b> تحت مربع السكان — الأوردرات اللي بوسطة بتردّها فعلاً: مندوبه <code>Bosta</code> + حالته <code>In-Return</code> (S1 أو S2) + حالة بوسطة <code>41 · Out For Return</code>. بيعرض رقم التتبع ونوع الراجع (RTO ولا بعد التسليم) وآخر تحديث من بوسطة، وزرار «➕ إضافة للمسح» بيحط الرقم في قايمة السكان. <b>عرض بحت مش حارس</b> — أوردر مش فيه لسه بيتسكن عادي والـ Worker هو اللي بيحكم. يحتاج Worker ≥ v3.6.0</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> <b>خروج تلقائي بعد ٦٠ دقيقة عدم نشاط</b> مع بانر تحذير قبلها بدقيقة، والخروج اليدوي بقى فوري من غير سؤال «تسجيل الخروج؟» (دفعة شغّالة = الخروج ممنوع)</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>توقيت القاهرة بقى بيتحسب مش +٣ ثابتة</b> — التوقيت الصيفي بيخلص 29-10-2026 والثابتة كانت هتغلّط كل وقت معروض بساعة</li>
+          <li class="cl-item"><span class="cl-tag fix">إصلاح</span> <b>إضافة أو حذف رقم أثناء تنفيذ دفعة بقى ممنوع</b> (قفل <code>isUpdating</code>)، وجدول السجل مابقاش ليه سقف ارتفاع رقمي بيقص الصفوف</li>
+          <li class="cl-item"><span class="cl-tag change">تغيير</span> النص الثانوي أغمق (<code>#4b5563</code>) · وصندوق السكان من غير <code>placeholder</code></li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.4</span>
           <span class="cl-ver-date">07-09-2026</span>
         </div>
         <ul class="cl-items">
@@ -1489,7 +1592,7 @@ input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-colo
 // مصدر **واحد** لرقم نسخة الواجهة — بيتقرا منه زرار الهيدر وبادج الـ Changelog
 // ونص شاشة الدخول عن طريق renderVersionUI(). ممنوع كتابته hardcoded في أكتر
 // من مكان (٣ نصوص بتتزامن يدويًا = باج "الرقم متفرّق").
-const TOOL_VERSION = '3.4';
+const TOOL_VERSION = '3.5';
 
 // أقل نسخة Worker الواجهة دي بتشتغل معاها. v3.3.0 هي اللي ضافت
 // `get_logs_export` بعقد { cap, total, truncated } وفلاتر السجل كقوايم —
@@ -1497,7 +1600,7 @@ const TOOL_VERSION = '3.4';
 // ⚠️ مالهاش أي علاقة بـ TOOL_VERSION — دي بتوصف الصفحة، ودي بتوصف أقل Worker
 // مقبول. متزامنهمش. وأي endpoint/حقل جديد الصفحة تعتمد عليه ⇒ ارفعها في نفس
 // التسليم، وإلا الحارس بيرجع لوضع "مفيش حماية".
-const MIN_WORKER_VERSION = '3.4.0';   // v3.4.0 = أول Worker بيرجّع `already` وبيقبل rejected[] و sortBy
+const MIN_WORKER_VERSION = '3.6.0';   // v3.6.0 = أول Worker فيه get_ready_to_return (طابور «راجع من بوسطة»). v3.4.0 كان `already` و rejected[] و sortBy
 let   workerVersion = null;
 
 // ── روابط الـ Workers — constants مش حقول إعدادات (Standards #28) ──
@@ -1552,15 +1655,34 @@ function statusBadgeClass(value) {
 }
 
 // ── §CONFIG::Time (datetime-format.md) ──
-function toCairo(iso) {
-  return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000);
+// 🔴 v7.0.0 — إزاحة القاهرة **بتتحسب** بـ Intl مش +٣ ثابتة: التوقيت الصيفي
+// بيخلص 29-10-2026 والثابتة كانت هتغلّط كل وقت معروض بساعة بلا أي خطأ.
+// toCairo بترجّع Date «مزاحة» بحيث getUTC*() = ساعة القاهرة (نفس الاستخدام القديم).
+const _cairoFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', hourCycle: 'h23',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+function cairoParts(d) {
+  const o = {};
+  for (const p of _cairoFmt.formatToParts(d)) if (p.type !== 'literal') o[p.type] = p.value;
+  if (o.hour === '24') o.hour = '00';
+  return o;
 }
+function cairoOffsetMs(d) {
+  const p = cairoParts(d);
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second)
+       - Math.floor(d.getTime() / 1000) * 1000;
+}
+function toCairo(iso) {
+  const d = new Date(iso);
+  return new Date(d.getTime() + cairoOffsetMs(d));
+}
+
+const pad = n => String(n).padStart(2, '0');
 
 // الصيغة الموحّدة (datetime-format.md): 📅 DD/MM/YYYY 🕐 HH:MM صباحاً/مساءً
 // بفواصل `/` وبدون كلمة "الساعة" وبدون بادج ملوّن حواليها.
 function formatDateTime(iso) {
   if (!iso) return '—';
-  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  const d = toCairo(iso);
   let h = d.getUTCHours();
   const ampm = h >= 12 ? 'مساءً' : 'صباحاً';
   h = h % 12 || 12;
@@ -1571,12 +1693,12 @@ function formatDateTime(iso) {
 // الخام، مش parsing لنص معروض (النص هش وبينكسر لو الصيغة اتغيّرت).
 function formatDate(iso) {
   if (!iso) return '—';
-  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  const d = toCairo(iso);
   return `📅 ${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)}/${d.getUTCFullYear()}`;
 }
 function formatTimeOnly(iso) {
   if (!iso) return '—';
-  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  const d = toCairo(iso);
   let h = d.getUTCHours();
   const ampm = h >= 12 ? 'مساءً' : 'صباحاً';
   h = h % 12 || 12;
@@ -1586,12 +1708,12 @@ function formatTimeOnly(iso) {
 // ⚠️ أعمدة XLSX — بدون إيموجي (بتكسر الفرز والفلترة جوّه الشيت)
 function formatDateForExport(iso) {
   if (!iso) return '—';
-  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  const d = toCairo(iso);
   return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth()+1)}-${d.getUTCFullYear()}`;
 }
 function formatTimeForExport(iso) {
   if (!iso) return '—';
-  const d = toCairo(iso), pad = n => String(n).padStart(2, '0');
+  const d = toCairo(iso);
   let h = d.getUTCHours();
   const ampm = h >= 12 ? 'مساءً' : 'صباحاً';
   h = h % 12 || 12;
@@ -2239,13 +2361,26 @@ async function finishLogin(username, displayName) {
   playBeep('success');
 
   document.getElementById('activeUserBtn').textContent = `👤 ${displayName}`;
+  hideLoginNotice();
+  idleStart();         // §IDLE-JS
   loadEmployeesList(); // reload to populate log filter
+  rqLoad(true);        // طابور «راجع من بوسطة» — قراءة بحتة، فشله مايمنعش السكان
   setTimeout(() => scanInputEl.focus(), 120);
 }
 
 // ── Logout ────────────────────────────────────────────────────
 function doLogout() {
-  if (!confirm('تسجيل الخروج؟')) return;
+  // Standards #52 — خروج يدوي فوري بلا confirm. دفعة شغّالة = حارس مش تأكيد.
+  if (isIdleBlocked()) {
+    showToast('فيه دفعة بتتنفّذ دلوقتي — استنى لحد ما تخلص', 'warning');
+    return;
+  }
+  performLogout('manual');
+}
+
+// reason: 'manual' | 'idle' — مسار واحد للاتنين
+function performLogout(reason) {
+  idleStop();
 
   if (currentEmployee) {
     apiGet('log_logout', { username: currentEmployee.username }).catch(() => {});
@@ -2266,6 +2401,7 @@ function doLogout() {
 
   document.getElementById('activeUserBtn').textContent = '👤 —';
   document.getElementById('loginOverlay').classList.remove('hidden');
+  if (reason === 'idle') showLoginNotice('تم تسجيل خروج تلقائي لعدم النشاط');
 
   // ── CUSTOMIZE: tool-specific reset ──────────────────────────────────────
   // ⚠️ v3.4 — قايمة المسح والنتايج كانت **بتفضل في الذاكرة بعد الخروج**، فموظف
@@ -2278,8 +2414,79 @@ function doLogout() {
   resetToStep1();
   closeResultModal();
   resolveConfirm(false);
+  rqReset();
   // ─────────────────────────────────────────────────────────────────────────
 }
+
+// ══════════════════════════════════════════════════════════════
+// §IDLE-JS — الخروج التلقائي لعدم النشاط (Standards #52 · references/idle-logout.md)
+// 60 دقيقة لكل الأدوات من غير استثناء. وقت فعلي (Date.now()) مش setTimeout طويل.
+// ══════════════════════════════════════════════════════════════
+const IDLE_TIMEOUT_MIN  = 60;     // ← ثابت موحّد — ممنوع تغييره لأداة بعينها
+const IDLE_WARN_SEC     = 60;     // التحذير قبل الخروج بدقيقة
+const IDLE_CHECK_MS     = 30000;
+const IDLE_THROTTLE_MS  = 10000;
+let   idleLastActivity  = Date.now();
+let   idleTicker        = null;
+let   idleFastTicker    = null;
+
+// true طول ما فيه تنفيذ دفعة شغّال (startUpdate) — الخروج التلقائي واقف ومعاه اليدوي
+function isIdleBlocked() { return isUpdating; }
+
+function idleMark() {
+  const now = Date.now();
+  if (now - idleLastActivity < IDLE_THROTTLE_MS) return;
+  idleLastActivity = now;
+  idleHideWarn();
+}
+// أحداث حقيقية بس — mousemove ممنوع، والـ polling/network مابيعدّش نشاط. السكانر
+// بيبعت ضغطات مفاتيح فبيتحسب نشاط تلقائي.
+['keydown', 'pointerdown', 'wheel', 'touchstart', 'scroll'].forEach(ev =>
+  document.addEventListener(ev, idleMark, { capture: true, passive: true })
+);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) idleTick(); });
+window.addEventListener('focus', idleTick);
+
+function idleStart() {
+  idleLastActivity = Date.now();
+  clearInterval(idleTicker);
+  idleTicker = setInterval(idleTick, IDLE_CHECK_MS);
+}
+function idleStop() {
+  clearInterval(idleTicker);
+  idleTicker = null;
+  idleHideWarn();
+}
+function idleStay() { idleLastActivity = Date.now(); idleHideWarn(); }   // زرار «أنا موجود»
+function idleTick() {
+  if (!currentEmployee) return;
+  const limit = IDLE_TIMEOUT_MIN * 60000;
+  if (isIdleBlocked()) { idleLastActivity = Date.now(); idleHideWarn(); return; }
+  const idleMs = Date.now() - idleLastActivity;
+  if (idleMs >= limit) { performLogout('idle'); return; }
+  const remainMs = limit - idleMs;
+  if (remainMs <= IDLE_WARN_SEC * 1000) idleShowWarn(Math.ceil(remainMs / 1000));
+  else idleHideWarn();
+}
+function idleShowWarn(sec) {
+  document.getElementById('idleWarnText').textContent = `سيتم تسجيل الخروج لعدم النشاط بعد ${sec} ثانية`;
+  document.getElementById('idleWarnAsk').textContent  = `هل أنت موجود يا ${currentEmployee ? currentEmployee.displayName : ''}؟`;
+  document.getElementById('idleWarn').classList.add('visible');
+  if (!idleFastTicker) idleFastTicker = setInterval(idleTick, 1000);
+}
+function idleHideWarn() {
+  document.getElementById('idleWarn')?.classList.remove('visible');
+  clearInterval(idleFastTicker);
+  idleFastTicker = null;
+}
+function showLoginNotice(msg) {
+  const el = document.getElementById('loginNotice');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+function hideLoginNotice() { document.getElementById('loginNotice')?.classList.remove('visible'); }
+
 
 // ══════════════════════════════════════════════════════════════
 // §SCAN — سكانر الجن (النمط الإلزامي: القراءة والمسح جوّه handleScan)
@@ -2321,6 +2528,9 @@ function addManual() {
 // ─── §TOOL-JS::state ───
 let scannedNums = [];
 let resultsData = [];
+// Standards #43 — قفل أثناء تنفيذ الدفعة: اللوب شغّال على لقطة (items) لكن resultsData
+// بتتقرا بالـ indexOf، فإضافة/حذف رقم في النص كان بيلخبط الصف اللي بيتلوّن.
+let isUpdating = false;
 
 // ─── §SCAN::TN_LEN — حارس الطول ───
 // أرقام تتبع بوسطة بين ٨ و١٣ رقم. بيمسك الحالتين اللي بيحصلوا فعلاً: باركودين
@@ -2329,6 +2539,7 @@ let resultsData = [];
 const TN_MIN_LEN = 8, TN_MAX_LEN = 13;
 
 function addTrackingNumber(num) {
+  if (isUpdating) { showToast('فيه دفعة بتتنفّذ دلوقتي — استنى لحد ما تخلص', 'warning'); return; }
   const clean = String(num).replace(/\D/g, '');
   if (!clean) { showToast('رقم التتبع يجب أن يحتوي على أرقام فقط', 'error'); playBeep('warn'); return; }
   if (clean.length < TN_MIN_LEN || clean.length > TN_MAX_LEN) {
@@ -2347,6 +2558,7 @@ function addTrackingNumber(num) {
 }
 
 function removeScanned(num) {
+  if (isUpdating) { showToast('فيه دفعة بتتنفّذ دلوقتي — استنى لحد ما تخلص', 'warning'); return; }
   scannedNums = scannedNums.filter(n => n !== num);
   // الجدول بيعكس قايمة المسح — صف لرقم اتشال ماينفعش يفضل معروض ولا مختار
   resultsData = resultsData.filter(r => r.trackingNumber !== num);
@@ -2356,6 +2568,7 @@ function removeScanned(num) {
 }
 
 function clearScans() {
+  if (isUpdating) { showToast('فيه دفعة بتتنفّذ دلوقتي — استنى لحد ما تخلص', 'warning'); return; }
   scannedNums = []; resultsData = [];
   renderScanList();
   document.getElementById('lookupBtn').disabled = true;
@@ -2835,6 +3048,7 @@ async function startUpdate() {
   }
 
   btn.innerHTML = `<div class="spinner"></div> جاري التحديث...`;
+  isUpdating = true;     // يتصفّر في finally تحت
   if (toUpdate.length) {
     progressWrap.style.display = '';
     progressText.textContent   = `0 / ${toUpdate.length.toLocaleString('en-US')}`;
@@ -3066,6 +3280,7 @@ async function startUpdate() {
     //    يكون فيه أوردرات اتلغت فعلاً. تاب السجل هو المرجع.
     showToast(`خطأ: ${err.message} — راجع تاب السجل قبل ما تعيد المحاولة`, 'error', 9000);
   } finally {
+    isUpdating = false;
     btn.disabled = false;
     updateUpdateBtn();
     setTimeout(() => { progressWrap.style.display = 'none'; }, 2500);
@@ -3364,7 +3579,7 @@ let dateFrom = null, dateTo = null;
 let dateFilterActive = false;
 let rangeDebounce = null;
 
-function cairoNow()          { return new Date(Date.now() + 3 * 60 * 60 * 1000); }
+function cairoNow()          { return toCairo(new Date()); }
 function cairoDateStr(d)     { const p = n => String(n).padStart(2, '0');
                                return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`; }
 function addDays(dateStr, n) { const d = new Date(`${dateStr}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return cairoDateStr(d); }
@@ -3793,6 +4008,117 @@ async function exportLogXLSX() {
   } catch (err) {
     showToast(`خطأ: ${err.message}`, 'error');
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+// §RQ-JS — طابور «راجع من بوسطة» (v3.5 · طلب أحمد 25-10-2026)
+// ══════════════════════════════════════════════════════════════
+// 🔴 الشروط التلاتة عايشة في الـ Worker (`get_ready_to_return`) — مش هنا.
+//    الصفحة بتعرض اللي راجع بالحرف ومابتفلترش ولا صف (درس R1). ⛔ ممنوع أي
+//    فلترة محلية على `bostaStatus` أو `machine`.
+// ⛔ عرض بحت — مش حارس. السكان والـ lookup/update زي ما هم بالحرف.
+// ⛔ مفيش polling ولا تحديث تلقائي: الجلب عند الدخول وعند «↻ تحديث» بس.
+const RQ_LATE_DAYS = 3;     // أقدم من كده بيتلوّن كهرماني — الطرد اللي بوسطة ردّته من فترة أولى بالسؤال
+const rqState = { orders: [], at: null, loading: false, failed: false };
+
+function rqDayDiff(iso) {
+  const today = cairoDateStr(toCairo(new Date()));
+  const that  = cairoDateStr(toCairo(iso));
+  return Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${that}T00:00:00Z`)) / 86400000);
+}
+function rqAgeText(iso) {
+  if (!iso) return { text: '', late: false };
+  const d = rqDayDiff(iso);
+  if (d <= 0) return { text: 'النهارده', late: false };
+  if (d === 1) return { text: 'من يوم', late: false };
+  if (d === 2) return { text: 'من يومين', late: false };
+  return { text: `من ${d} أيام`, late: d >= RQ_LATE_DAYS };
+}
+
+// ⚠️ العدّاد قبل أول جلب ناجح = `—` مش `0` — «ما اتحدّثش» ≠ «مفيش شغل».
+function rqRender() {
+  const rows = rqState.orders;
+  const tbody = document.getElementById('rqBody');
+  document.getElementById('rqCount').textContent = rqState.at ? rows.length.toLocaleString('en-US') : '—';
+  document.getElementById('rqStamp').textContent = rqState.at ? `آخر تحديث: ${formatDateTime(rqState.at.toISOString())}` : '';
+
+  const empty = document.getElementById('rqEmpty'), wrap = document.getElementById('rqTableWrap');
+  if (!rows.length) {
+    wrap.style.display = 'none';
+    empty.style.display = '';
+    empty.innerHTML = rqState.at
+      ? '<div class="icon">✅</div><div>مفيش أوردرات بوسطة راجعاها دلوقتي</div>'
+      : (rqState.failed ? '<div class="icon">⚠️</div><div>تعذّر تحميل الطابور — اضغط «↻ تحديث»</div>'
+                        : '<div class="icon">⏳</div><div>جاري الاستعلام عن الأوردرات برجاء الانتظار ...</div>');
+    return;
+  }
+  empty.style.display = 'none';
+  wrap.style.display = '';
+  tbody.innerHTML = rows.map((o, i) => {
+    const age = rqAgeText(o.createdAt);
+    const machine = o.machine === 'S2'
+      ? '<span class="badge badge-neutral">[S-2] مرتجع بعد التسليم</span>'
+      : '<span class="badge badge-blue">S1 راجع قبل التسليم (RTO)</span>';
+    const inList = o.tracking && scannedNums.includes(String(o.tracking));
+    const action = !o.tracking ? '<span class="tracking-num">—</span>'
+      : inList ? '<span class="badge badge-success">✓ في القايمة</span>'
+      : `<button class="btn btn-outline btn-sm" onclick="rqAddRow(${i})">➕ إضافة للمسح</button>`;
+    return `<tr>
+      <td>${orderLink(esc(o.orderName), o.orderId)}</td>
+      <td class="rq-cust">${esc(o.customer || '—')}</td>
+      <td><span class="tracking-num">${esc(o.tracking || '—')}</span>${o.trackingLegacy ? ' <span class="badge badge-neutral" title="الرقم جاي من الحقل القديم bosta_tracking_number">قديم</span>' : ''}</td>
+      <td>${machine}</td>
+      <td><span class="badge badge-warn">${esc(o.bostaStatus)}</span></td>
+      <td>${o.bostaStatusAt ? esc(formatDateTime(o.bostaStatusAt)) : '—'}</td>
+      <td>${esc(formatDate(o.createdAt))}<span class="rq-age${age.late ? ' late' : ''}">${esc(age.text)}</span></td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+}
+
+// الإضافة بتعدّي على نفس مسار السكان (addTrackingNumber) — مفيش مسار إضافة تاني.
+function rqAddRow(i) {
+  const o = rqState.orders[i];
+  if (!o || !o.tracking) return;
+  addTrackingNumber(String(o.tracking));
+  rqRender();
+}
+
+// ⚠️ `loading` بيمنع نداءين متوازيين (ضغطتين ورا بعض).
+async function rqLoad(silent) {
+  if (rqState.loading) return;
+  rqState.loading = true;
+  const btn = document.getElementById('rqRefreshBtn');
+  btn.disabled = true; btn.textContent = '⏳ جاري التحديث ...';
+  try {
+    const data = await apiGet('get_ready_to_return');
+    rqState.orders = Array.isArray(data.orders) ? data.orders : [];
+    rqState.at = new Date();
+    rqState.failed = false;
+    document.getElementById('rqFail').style.display = 'none';
+    // الاقتطاع بانر منفصل عن الفشل — «الطابور أطول من المعروض» ≠ «ما اتجابش»
+    const tr = document.getElementById('rqTrunc');
+    tr.style.display = data.truncated ? '' : 'none';
+    if (data.truncated) tr.textContent = '⚠️ الاستعلام وصل لحد الصفحات المسموح — فيه أوردرات راجعة ممكن مش ظاهرة. اسكن عادي، والـ Worker هو اللي بيحكم.';
+  } catch (err) {
+    // الفشل بيتقال، والقايمة القديمة بتفضل لو كان فيه جلب ناجح قبله. والسكان شغّال عادي.
+    rqState.failed = true;
+    const f = document.getElementById('rqFail');
+    f.style.display = '';
+    f.textContent = `⚠️ تعذّر تحميل طابور «راجع من بوسطة» — ${err.message}. السكان شغّال عادي.`;
+  } finally {
+    rqState.loading = false;
+    btn.disabled = false; btn.textContent = '↻ تحديث';
+    rqRender();
+    if (!silent) scanInputEl.focus();
+  }
+}
+
+function rqReset() {
+  rqState.orders = []; rqState.at = null; rqState.failed = false;
+  document.getElementById('rqFail').style.display = 'none';
+  document.getElementById('rqTrunc').style.display = 'none';
+  rqRender();
 }
 
 // ─── §TOOL-JS::autoFocus ───

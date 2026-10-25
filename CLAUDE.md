@@ -2,14 +2,14 @@
 
 # سكانر أوردرات المرتجعات (`Bosta-Orders-Returned-Scanner`)
 
-![version](https://img.shields.io/badge/version-v2.0.0-blue)
+![version](https://img.shields.io/badge/version-v2.1.0-blue)
 
 **بتعمل إيه:** الموظف بيمسح تراكينج نمبر بوسطة لأوردرات راجعة (RTO أو مرتجع بعد
 التسليم)، والأداة بتتحقق من الحالة على شوبيفاي وتحدّث ميتافيلد S1/S2 + تلغي
 الأوردر (مسار RTO) أو تسترجع القطع للمخزون (مسار مرتجع بعد التسليم) **+ تحدّث
 عهدة الطرد لـ `Warehouse` (v3.5.0)**.
 **مين بيستخدمها:** مخزن (استلام المرتجعات).
-**الإصدار:** Worker `v3.5.0` · الواجهة `v3.4`
+**الإصدار:** Worker `v3.6.0` · الواجهة `v3.5`
 
 ## الروابط
 
@@ -28,6 +28,7 @@
 | `diag` | فحص ذاتي كامل (env · CORS · D1 · شوبيفاي + الصلاحيات · LOCATION_ID · بوسطة) — صفر كتابة |
 | `lookup` | بحث بوسطة بالتراكينج + فحص شوبيفاي (S1/S2/returnStatus) + التحقق من صلاحية الانتقال — بدون كتابة |
 | `update` | تنفيذ فعلي: إلغاء الأوردر (RTO) أو استرجاع مخزون (مرتجع بعد التسليم) **+ `package_whereabouts_s1`/`_s2` = `Warehouse` (v3.5.0 · §WHEREABOUTS)** + تحقق بعد التنفيذ + D1 log · وبياخد كمان `rejected[]` فبيسجّلها بـ `type = 'rejected'` **من غير أي تنفيذ** (v3.4.0) |
+| `get_ready_to_return` | **(v3.6.0)** طابور «راجع من بوسطة» — GET، قراءة بحتة: مندوبه `Bosta` + `In-Return` (S1/S2) + `bosta_webhook_status_update_s1/s2` كوده 41. صف لكل ماكينة مستوفية. راجع §READY-RETURN |
 | `get_logs` / `get_logs_count` | تاب السجل — فلترة server-side بقوايم (`employees` · `results` · `machines`) + `search` + `dateFrom`/`dateTo` + **ترتيب server-side** (`sortBy`/`sortDir` بقائمة بيضاء)، صفحة ١٠٠ صف |
 | `get_logs_export` | التصدير — بيرجّع `{ entries, cap, total, truncated }`، مش الصفوف لوحدها |
 
@@ -103,6 +104,25 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
 
 > ومن v3.4.0 المشكلة اتقفلت من المصدر: الصفوف اللي ما لمستش شوبيفاي بقت تحت
 > `type = 'rejected'` مش `update`.
+
+## 📦 §READY-RETURN — طابور «راجع من بوسطة» (v3.6.0 · طلب أحمد 25-10-2026)
+
+> ⚠️ **تعديل Worker — Promote مطلوب.** `WORKER_VERSION` بقى `3.6.0` و`MIN_WORKER_VERSION` في الواجهة بقى `3.6.0`.
+
+الأوردرات اللي بوسطة **بتردّها فعلاً** ومستنية تتسكن: **①** `custom.courier` = `Bosta` · **②** `In-Return` على الماكينة (S1 = `manual_status` · S2 = `status_2_r_e`) · **③** ميتافيلد الـ webhook بتاع **نفس** الماكينة (`custom.bosta_webhook_status_update_s1/s2`) كوده `41` (القيمة المخزّنة `41 · Out For Return`).
+
+- 🔴 **الشروط بتتأكد في الكود مش بالاستعلام بس.** فلتر ميتافيلد مش «filterable» بيتجاهله شوبيفاي في صمت ويرجّع المتجر كله (نفس الفخ الموثّق في الهب لـ`package_whereabouts`). الاستعلام بيضيّق على الحالتين `In-Return`، والكود هو اللي بيحكم. حارس الحلقة: `READY_RETURN_MAX_PAGES = 12` × `READY_RETURN_PAGE = 50` — لو اتضرب بيرجع `truncated: true` والواجهة بتطلّع بانر.
+- أوردر مستوفي الماكينتين بيطلع **صفّين** (`machine: 'S1' | 'S2'`). الرد: `{ ok, orders[], scanned, truncated, serverTime }`.
+- ⛔ **عرض بحت — مش حارس.** الحارس الحقيقي لسه `validateTransition` وقت `lookup`/`update`. الطابور عمره ما يمنع سكان.
+- ⚠️ **مفاتيح لازم تتأكد من أحمد:** `custom.bosta_webhook_last_update_s1/s2` (مخمّنة من اسم الحقل «Bosta Webhook Last Update» — لو غلط عمود «آخر تحديث من بوسطة» بيقول `—` بس) · وقيمة `custom.courier` = `Bosta` حرفيًا (المقارنة بدون حساسية حروف ومسافات). الفلتر على `status_2_r_e:'In-Return'` ما اتجرّبش على شوبيفاي حقيقي.
+- الواجهة: كارت `#rqCard` تحت الخطوة ١ (`§RQ-JS`) + زرار «➕ إضافة للمسح» بيعدّي على `addTrackingNumber` (مفيش مسار إضافة تاني). **الجلب عند الدخول وعند «↻ تحديث» بس** — مفيش تحديث تلقائي.
+- 🔴 **نفس التعديل في `Warehouse-Operations-Center/Bosta-Orders-Returned-Scanner.html` (هب v1.62.0)** — الملفين متطابقين في §TOOL-JS و§RQ-JS، وأي إصلاح لازم يتعمل في الاتنين.
+
+## 🔎 مراجعة الواجهة مقابل `ecommoda-html-builder` v8.5.0 — **جزئية** (25-10-2026)
+
+اتطبّق: توقيت القاهرة بـ`Intl` بدل +٣ ثابتة (**قبل 29-10-2026 تغيير التوقيت الصيفي**) · خروج تلقائي ٦٠ د + خروج يدوي بلا `confirm` (#52) · قفل الدفعة `isUpdating` (#43) · `.tbl-body-wrap` على `grid` (#46) · `--text-secondary`/`--text-muted` = `#4b5563` (#48) · صندوق السكان من غير `placeholder`.
+
+🟡 **لسه مفتوح (قرار أحمد — كل بند تمريرة لوحده):** فلاتر تاب السجل في **رأس العمود** (#47) بدل قسم الفلاتر · التحكم اللايف في عرض الأعمدة (#51) · `th`/`td` بخط #49 + عناوين sticky · `th` uppercase. **بصمة html-builder فضلت `v6.6.0`** لأن المراجعة الكاملة ما خلصتش (البصمة ادعاء بإن الملف اتراجع). «مربع الإدخال الموحّد» (#53) مش منطبق — الأداة بتقبل نوع معرّف واحد (تراكينج بوسطة).
 
 ## 🔴 الاكتشاف الحاكم في مراجعة 07-09-2026 — والإصلاح
 
@@ -329,8 +349,8 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
 | ecommoda-order-lifecycle | v1.8.0 (§WHEREABOUTS — راجع بند مفتوح تحت) |
 | shopify-graphql-helper | v1.0.0 |
 
-آخر مطابقة: 24-09-2026 · `index.js` v3.5.1 · `index.html` v3.4
-🔴 معلّقة: **Promote لـ v3.5.1** (حاجز لتفعيل الحارس الديناميكي لقيم اللوج —
+آخر مطابقة: 25-10-2026 · `index.js` v3.6.0 · `index.html` v3.5
+🔴 معلّقة: **Promote لـ v3.6.0** (حاجز لطابور «راجع من بوسطة» — §READY-RETURN) · **Promote لـ v3.5.1** (حاجز لتفعيل الحارس الديناميكي لقيم اللوج —
 §LOG-REG تحت) · **Promote لـ v3.5.0** (حاجز لكتابة عهدة الطرد — §WHEREABOUTS) ·
 **`WORKER_SECRET` = سر مجموعة `warehouse_ops` → Promote** (حاجز
 لصفحة `returned.html` في الهب) · **`runDiag()` بترمي على `UI_VERSION`**
@@ -495,6 +515,8 @@ SELECT type, json_extract(extra,'$.result') AS res, COUNT(*) n, MAX(timestamp) l
 + `extra._unregistered = true` + UPSERT صامت في `log_value_alerts` — **مفيش
 رفض كتابة أبدًا**. الجدول مشترك على مستوى الستاك ومفروض موجود خلاص، فمفيش
 `CREATE TABLE` في الكود ده.
+
+آخر تحديث: 25-10-2026 — v3.6.0 (§READY-RETURN — طابور «راجع من بوسطة») + مراجعة جزئية على html-builder v8.5.0 (واجهة v3.5).
 
 آخر تحديث: 25-09-2026 — **صفحة الهب اتسمّت تاني.** رابط الصفحة جوّه
 `Warehouse-Operations-Center` بقى `Bosta-Orders-Returned-Scanner.html` بدل

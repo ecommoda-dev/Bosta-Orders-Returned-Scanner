@@ -5,6 +5,21 @@
 //                       (extra.sourceTool = "bosta_orders_returned_scanner" — see §CONSTANTS)
 //
 // ═══════════════════════════════════════════════════════════════════════════
+// v3.6.0 — §READY-RETURN: طابور «راجع من بوسطة» (طلب أحمد 25-10-2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// endpoint جديد `?action=get_ready_to_return` — قراءة بحتة، صفر كتابة. بيرجّع
+// الأوردرات اللي بوسطة **بتردّها فعلاً** ومستنية تتسكن في المخزن:
+//   ① المندوب (`custom.courier`) = Bosta
+//   ② الحالة `In-Return` على الماكينة (S1 = `manual_status` · S2 = `status_2_r_e`)
+//   ③ ميتافيلد الـ webhook بتاع نفس الماكينة (`bosta_webhook_status_update_s1/s2`)
+//      كوده = 41 (Out For Return) — القيمة المخزّنة «41 · Out For Return».
+// الأوردر اللي عليه الماكينتين مستوفيتين بيطلع صفّين (واحد لكل ماكينة).
+// ⚠️ الفلترة على الميتافيلدات **بتتأكد في الكود** مش بالاستعلام بس: فلتر
+// ميتافيلد مش «filterable» بيتجاهله شوبيفاي في صمت ويرجّع المتجر كله.
+// ⛔ الطابور عرض بحت — مش حارس. الحارس الحقيقي لسه `validateTransition` وقت
+// `lookup`/`update` على بيانات حيّة.
+//
+// ═══════════════════════════════════════════════════════════════════════════
 // v3.5.1 — §LOG-REG: الحارس الديناميكي لقيم اللوج (الطبقة ٥ · ecommoda-worker-builder Step 7-ج)
 // ═══════════════════════════════════════════════════════════════════════════
 // مراقبة بس — صفر تعديل منطق تشغيلي. `writeLog` بقى بيقارن الزوج (tool, type)
@@ -153,7 +168,7 @@
 // ══════════════════════════════════════════════════════════════
 // §CONSTANTS
 // ══════════════════════════════════════════════════════════════
-const WORKER_VERSION   = '3.5.1';
+const WORKER_VERSION   = '3.6.0';
 const API_VERSION      = '2026-01';                          // صريح دايمًا — أبدًا "latest"
 const TOOL_NAME        = 'bosta_return';                     // login/logout D1 logging only — unchanged
 const SOURCE_TOOL      = 'bosta_orders_returned_scanner';    // used in extra.sourceTool for status-write logs
@@ -167,6 +182,11 @@ const BOSTA_API_BASE   = 'https://app.bosta.co/api/v2';
 // النداءات المتتابعة والمتصفح بيقطع في النص — **والإلغاء لا رجعة فيه**، يعني
 // الفعل يكون حصل والواجهة مش عارفة. الواجهة بتقسّم على ١٠ أصلاً (v3.4).
 const MAX_BATCH = 200;
+
+// ─── §CONSTANTS::readyReturn — طابور «راجع من بوسطة» ───
+const BOSTA_OUT_FOR_RETURN_CODE = 41;     // `41 · Out For Return` — كود حالة بوسطة في ميتافيلد الـ webhook
+const READY_RETURN_PAGE   = 50;           // حجم الصفحة: ~١٢ ميتافيلد × ٥٠ أوردر تحت سقف تكلفة الاستعلام الواحد
+const READY_RETURN_MAX_PAGES = 12;        // حارس حلقة مش سقف بيانات — لو اتضرب بيرجع truncated:true
 
 // الصلاحيات اللي الأداة مش هتشتغل من غيرها — بيتفحصوا في ?action=diag
 // v3.3.0 — القايمة كانت أربعة بس بينما رأس الملف و`CLAUDE.md` بيقولوا سبعة.
@@ -1404,6 +1424,11 @@ export default {
         return handleUpdate(request, env);
       }
 
+      if (action === 'get_ready_to_return') {
+        if (request.method !== 'GET') return json({ error: 'GET required' }, 405, request);
+        return handleReadyReturn(request, env);
+      }
+
       // ─── §LOG-ENDPOINTS ─────────────────────────────────────────────────
 
       if (action === 'get_logs') {
@@ -1451,6 +1476,91 @@ export default {
     }
   },
 };
+
+// ─── §READY-RETURN::handleReadyReturn ───
+// «الأوردرات اللي بوسطة راجعاها» — قراءة بحتة. الشروط التلاتة في الـ constants فوق.
+// الكود هنا هو **المصدر الوحيد** للقاعدة: الواجهة (المستقلة والهب) بتعرض اللي
+// راجع بالحرف ومابتفلترش ولا صف (درس R1).
+function readyReturnCode(raw) {
+  // «41 · Out For Return» → 41. أي قيمة مش بتبدأ برقم = null (مش معروف، مش صفر).
+  const m = String(raw ?? '').trim().match(/^(\d{1,3})\b/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+async function handleReadyReturn(request, env) {
+  try { assertEnv(env, 'shopify'); }
+  catch (e) { return json({ error: e.message }, 500, request); }
+
+  const token = await getAccessToken(env);
+  const search = `(metafields.custom.manual_status:'${S1_STATUS.IN_RETURN}' OR metafields.custom.status_2_r_e:'${S2_STATUS.IN_RETURN}')`;
+
+  const query = `query($first: Int!, $after: String, $q: String!) {
+    orders(first: $first, after: $after, query: $q, sortKey: UPDATED_AT, reverse: true) {
+      pageInfo { hasNextPage endCursor }
+      edges { node {
+        id legacyResourceId name createdAt
+        shippingAddress { name }
+        courier:  metafield(namespace: "custom", key: "courier") { value }
+        s1:       metafield(namespace: "custom", key: "manual_status") { value }
+        s2:       metafield(namespace: "custom", key: "status_2_r_e") { value }
+        tn1:      metafield(namespace: "custom", key: "bosta_tracking_number_s1") { value }
+        tn2:      metafield(namespace: "custom", key: "bosta_tracking_number_s2") { value }
+        tnOld:    metafield(namespace: "custom", key: "bosta_tracking_number") { value }
+        wh1:      metafield(namespace: "custom", key: "bosta_webhook_status_update_s1") { value }
+        wh2:      metafield(namespace: "custom", key: "bosta_webhook_status_update_s2") { value }
+        whAt1:    metafield(namespace: "custom", key: "bosta_webhook_last_update_s1") { value }
+        whAt2:    metafield(namespace: "custom", key: "bosta_webhook_last_update_s2") { value }
+        where1:   metafield(namespace: "custom", key: "package_whereabouts_s1") { value }
+        where2:   metafield(namespace: "custom", key: "package_whereabouts_s2") { value }
+      } }
+    }
+  }`;
+
+  const rows = [];
+  let scanned = 0, after = null, truncated = false;
+
+  for (let page = 0; page < READY_RETURN_MAX_PAGES; page++) {
+    const resp = await shopifyGQL(env, token, query,
+      { first: READY_RETURN_PAGE, after, q: search }, 'طابور راجع من بوسطة');
+    const conn = resp.data?.orders;
+    if (!conn) throw new Error('طابور راجع من بوسطة: شوبيفاي رجّعت رد من غير orders');
+
+    for (const { node: o } of conn.edges) {
+      scanned++;
+      // ① المندوب بوسطة — مقارنة بدون حساسية حروف ولا مسافات
+      if (String(o.courier?.value ?? '').trim().toLowerCase() !== 'bosta') continue;
+
+      const emit = (machine, status, whRaw, whAt, tn, where) => {
+        // ② In-Return على الماكينة دي  ③ كود الـ webhook = 41
+        if (status !== (machine === 'S1' ? S1_STATUS.IN_RETURN : S2_STATUS.IN_RETURN)) return;
+        if (readyReturnCode(whRaw) !== BOSTA_OUT_FOR_RETURN_CODE) return;
+        rows.push({
+          orderId:     o.legacyResourceId,
+          orderName:   o.name,
+          createdAt:   o.createdAt,
+          customer:    o.shippingAddress?.name || null,
+          machine,                                   // 'S1' = RTO · 'S2' = مرتجع بعد التسليم
+          tracking:    tn?.value || (machine === 'S1' ? o.tnOld?.value : null) || null,
+          trackingLegacy: !tn?.value && machine === 'S1' && !!o.tnOld?.value,
+          bostaStatus: String(whRaw).trim(),
+          bostaStatusAt: whAt?.value || null,
+          whereabouts: where?.value || null,
+        });
+      };
+      emit('S1', o.s1?.value, o.wh1?.value, o.whAt1, o.tn1, o.where1);
+      emit('S2', o.s2?.value, o.wh2?.value, o.whAt2, o.tn2, o.where2);
+    }
+
+    if (!conn.pageInfo.hasNextPage) break;
+    after = conn.pageInfo.endCursor;
+    if (page === READY_RETURN_MAX_PAGES - 1) truncated = true;
+  }
+
+  // الأقدم أول: الطرد اللي بوسطة ردّته من أكتر وقت هو الأولى بالسؤال عنه.
+  rows.sort((a, b) => String(a.bostaStatusAt || a.createdAt).localeCompare(String(b.bostaStatusAt || b.createdAt)));
+
+  return json({ ok: true, orders: rows, scanned, truncated, serverTime: new Date().toISOString() }, 200, request);
+}
 
 // ─── §DIAG::handleDiag ───
 // فحص ذاتي بدون أي كتابة. كل فحص بيرجع { ok, detail } وبنرجّع allOk في الآخر.
