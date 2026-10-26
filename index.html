@@ -1103,7 +1103,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 
           <h4>كيف تعمل — Workflow</h4>
           <ol>
-            <li>الموظف يمسح أرقام تتبع بوسطة (سكانر أو يدوي)</li>
+            <li>الموظف يمسح أرقام تتبع بوسطة (سكانر أو يدوي) — أو يضغط «➕ إضافة للمسح» من طابور «راجع من بوسطة» (عرض بحت، مش حارس)</li>
             <li>الأداة تستعلم بوسطة، وتجيب S1/S2/returnStatus من شوبيفاي لكل أوردر</li>
             <li>تتحقق من جدول القرار (تحت) وتعرض النتيجة — متوافق أو مرفوض مع السبب</li>
             <li>الموظف يراجع ويحدد الأوردرات المتوافقة، ثم يضغط "تحديث شوبيفاي"</li>
@@ -1176,7 +1176,9 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
             <li><code>§RQ-JS</code> — طابور «راجع من بوسطة» (<code>rqLoad</code> · <code>rqRender</code> · <code>rqAddRow</code>): عرض بحت بصفر فلترة محلية، وبيجيب عند الدخول وعند «↻ تحديث» بس</li>
             <li><code>§IDLE-JS</code> — خروج تلقائي بعد ٦٠ دقيقة عدم نشاط (وقت فعلي · بانر تحذير · واقف أثناء الدفعة) · <code>performLogout(reason)</code></li>
             <li><code>§TOOL-JS</code> — <code>lookup</code> · جدول النتائج · <code>startUpdate</code> (٣ حالات) · تصدير النتائج</li>
-            <li><code>§LOG-JS</code> — تاب السجل: القسم الموحّد (فلاتر multi-select + مدى تاريخ + ترتيب ٣ حالات + صف النتائج) و pagination وتصدير XLSX ببانر التقصّ</li>
+            <li><code>§LOG-JS</code> — تاب السجل: القسم الموحّد (فلاتر في رأس العمود <code>srvLog</code> + ترتيب ٣ حالات + صف النتائج) و pagination وتصدير XLSX ببانر التقصّ</li>
+            <li><code>§SRV-FILTERS</code> — <code>ecoSrvFilters</code>: نسخة inline من <code>shared/srv-filters.js</code> في الهب (قوايم/نص/تاريخ، الفلتر server-side عبر <code>params()</code>) — أي إصلاح فيه يتعمل في الاتنين</li>
+            <li><code>§COL-RESIZE</code> — سحب عرض الأعمدة (مقبض في كل <code>th</code> · دبل كليك = ضبط على المحتوى · محفوظ في <code>localStorage</code>)</li>
           </ul>
 
           <h4>KEY VARIABLES</h4>
@@ -1192,7 +1194,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
             <li><code>API_TIMEOUT_MS</code> — مهلة ٩٠ ثانية على كل نداء (AbortController)</li>
             <li><code>MIN_WORKER_VERSION</code> — أقل نسخة Worker الواجهة بتشتغل معاها. <b>مالهاش أي علاقة بـ <code>TOOL_VERSION</code></b> — دي بتوصف الصفحة ودي بتوصف أقل Worker مقبول</li>
             <li><code>WORKER_URL</code> / <code>ADMIN_WORKER_URL</code> — constants في <code>§CONFIG</code>، مش حقول إعدادات ولا <code>localStorage</code></li>
-            <li><code>LS_SECRET</code> — المفتاح الوحيد في <code>localStorage</code> (السر الفعلي، والريبو Public)</li>
+            <li><code>LS_SECRET</code> — مفتاح السر الفعلي في <code>localStorage</code> (والريبو Public)</li>
+            <li><code>COL_LS = 'bosta_returned_scanner_col_widths_v1'</code> — تفضيل عرض أعمدة السجل (تفضيل شاشة مش هوية؛ ارفع <code>_v</code> لو الأعمدة اتغيّرت)</li>
           </ul>
 
           <h4>NOTES</h4>
