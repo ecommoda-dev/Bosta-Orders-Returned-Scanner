@@ -5,6 +5,8 @@
 //                       (extra.sourceTool = "bosta_orders_returned_scanner" — see §CONSTANTS)
 //
 // ═══════════════════════════════════════════════════════════════════════════
+// v3.6.1 — `costLog` في `handleReadyReturn`: `queryCost` { calls, actualTotal, requestedTotal, maxActual }
+//          في رد `get_ready_to_return` (قياس `actualQueryCost` بدل التخمين). مراقبة بس — صفر تعديل منطق.
 // v3.6.0 — §READY-RETURN: طابور «راجع من بوسطة» (طلب أحمد 25-10-2026)
 // ═══════════════════════════════════════════════════════════════════════════
 // endpoint جديد `?action=get_ready_to_return` — قراءة بحتة، صفر كتابة. بيرجّع
@@ -168,7 +170,7 @@
 // ══════════════════════════════════════════════════════════════
 // §CONSTANTS
 // ══════════════════════════════════════════════════════════════
-const WORKER_VERSION   = '3.6.0';
+const WORKER_VERSION   = '3.6.1';
 const API_VERSION      = '2026-01';                          // صريح دايمًا — أبدًا "latest"
 const TOOL_NAME        = 'bosta_return';                     // login/logout D1 logging only — unchanged
 const SOURCE_TOOL      = 'bosta_orders_returned_scanner';    // used in extra.sourceTool for status-write logs
@@ -724,7 +726,12 @@ async function getAccessToken(env) {
 // شوبيفاي، وبيوصل للموظف في الواجهة وللسجل في D1.
 // + إعادة محاولة تلقائية على THROTTLED / 429 / 5xx (الأداة بتعمل نداءات
 //   متتابعة كتير لكل أوردر، والـ throttle وارد جدًا في دفعة كبيرة).
-async function shopifyGQL(env, token, query, variables = {}, opName = 'shopify') {
+//
+// v3.6.1 — `costLog` (اختياري): لو اتبعت مصفوفة، كل نداء ناجح بيضيف فيها
+// `{ op, requested, actual }` من `extensions.cost`. القياس على `actualQueryCost`
+// (اللي اتاكل فعلاً من الرصيد) مش `requestedQueryCost` (سقف نظري). قراءة بحتة —
+// صفر أثر على أي مسار ما بعتش `costLog` (كلهم ما عدا `handleReadyReturn`).
+async function shopifyGQL(env, token, query, variables = {}, opName = 'shopify', costLog = null) {
   const MAX_ATTEMPTS = 3;
   let lastErr = null;
 
@@ -770,6 +777,9 @@ async function shopifyGQL(env, token, query, variables = {}, opName = 'shopify')
 
     // ④ رد سليم شكلاً لكن بدون data
     if (!data.data) throw new Error(`${opName}: رد شوبيفاي بدون data — ${text.slice(0, 180)}`);
+
+    const cost = data.extensions?.cost;
+    if (costLog && cost) costLog.push({ op: opName, requested: cost.requestedQueryCost ?? null, actual: cost.actualQueryCost ?? null });
 
     return data;
   }
@@ -1517,11 +1527,12 @@ async function handleReadyReturn(request, env) {
   }`;
 
   const rows = [];
+  const costLog = [];   // v3.6.1 — قياس `actualQueryCost` لكل صفحة (للتشخيص بس، الواجهة مابتقراهوش)
   let scanned = 0, after = null, truncated = false;
 
   for (let page = 0; page < READY_RETURN_MAX_PAGES; page++) {
     const resp = await shopifyGQL(env, token, query,
-      { first: READY_RETURN_PAGE, after, q: search }, 'طابور راجع من بوسطة');
+      { first: READY_RETURN_PAGE, after, q: search }, 'طابور راجع من بوسطة', costLog);
     const conn = resp.data?.orders;
     if (!conn) throw new Error('طابور راجع من بوسطة: شوبيفاي رجّعت رد من غير orders');
 
@@ -1559,7 +1570,17 @@ async function handleReadyReturn(request, env) {
   // الأقدم أول: الطرد اللي بوسطة ردّته من أكتر وقت هو الأولى بالسؤال عنه.
   rows.sort((a, b) => String(a.bostaStatusAt || a.createdAt).localeCompare(String(b.bostaStatusAt || b.createdAt)));
 
-  return json({ ok: true, orders: rows, scanned, truncated, serverTime: new Date().toISOString() }, 200, request);
+  // 🟡 `queryCost` للقياس بس — مفيش أي اعتماد عليه في الواجهة (الهب ولا الأداة المستقلة)، وحذفه بلا أي أثر.
+  //    `actualTotal` هو الرقم اللي بيتقارن بـ`step1ActualTotal`/`totalActual` في `get_ready_to_warehouse`.
+  const sum = k => costLog.reduce((a, c) => a + (c[k] || 0), 0);
+  const queryCost = {
+    calls: costLog.length,
+    actualTotal: sum('actual'),
+    requestedTotal: sum('requested'),
+    maxActual: costLog.reduce((m, c) => Math.max(m, c.actual || 0), 0),
+  };
+
+  return json({ ok: true, orders: rows, scanned, truncated, queryCost, serverTime: new Date().toISOString() }, 200, request);
 }
 
 // ─── §DIAG::handleDiag ───

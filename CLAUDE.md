@@ -9,7 +9,7 @@
 الأوردر (مسار RTO) أو تسترجع القطع للمخزون (مسار مرتجع بعد التسليم) **+ تحدّث
 عهدة الطرد لـ `Warehouse` (v3.5.0)**.
 **مين بيستخدمها:** مخزن (استلام المرتجعات).
-**الإصدار:** Worker `v3.6.0` · الواجهة `v3.5`
+**الإصدار:** Worker `v3.6.1` · الواجهة `v3.5`
 
 ## الروابط
 
@@ -113,6 +113,7 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
 
 - 🔴 **الشروط بتتأكد في الكود مش بالاستعلام بس.** فلتر ميتافيلد مش «filterable» بيتجاهله شوبيفاي في صمت ويرجّع المتجر كله (نفس الفخ الموثّق في الهب لـ`package_whereabouts`). الاستعلام بيضيّق على الحالتين `In-Return`، والكود هو اللي بيحكم. حارس الحلقة: `READY_RETURN_MAX_PAGES = 12` × `READY_RETURN_PAGE = 50` — لو اتضرب بيرجع `truncated: true` والواجهة بتطلّع بانر.
 - أوردر مستوفي الماكينتين بيطلع **صفّين** (`machine: 'S1' | 'S2'`). الرد: `{ ok, orders[], scanned, truncated, serverTime }`.
+- 🟡 **`queryCost` (v3.6.1 · قياس `actualQueryCost`):** رد `get_ready_to_return` بقى فيه `queryCost: { calls, actualTotal, requestedTotal, maxActual }` — من `extensions.cost` لكل صفحة عن طريق `costLog` (باراميتر اختياري سادس في `shopifyGQL`، زي `package-transfer-to-warehouse-worker`). **للقياس بس:** الواجهة (المستقلة والهب) مابتقراهوش، ومفيش `min` اترفع، و`MIN_WORKER_VERSION` فضل `3.6.0`. الرقم اللي بيتقارن: `actualTotal` هنا مقابل `totalActual` في `get_ready_to_warehouse`. ⚠️ `actual` هو اللي اتاكل من الرصيد، و`requested` سقف نظري — القياس والمقارنة على `actual` بس. **أول فتح حقيقي بعد Promote هو القياس الفعلي.** ⛔ أي نداء تاني لـ`shopifyGQL` ما بيبعتش `costLog` — سلوكه ما اتغيّرش.
 - ⛔ **عرض بحت — مش حارس.** الحارس الحقيقي لسه `validateTransition` وقت `lookup`/`update`. الطابور عمره ما يمنع سكان.
 - ⚠️ **مفاتيح لازم تتأكد من أحمد:** `custom.bosta_webhook_last_update_s1/s2` (مخمّنة من اسم الحقل «Bosta Webhook Last Update» — لو غلط عمود «آخر تحديث من بوسطة» بيقول `—` بس) · وقيمة `custom.courier` = `Bosta` حرفيًا (المقارنة بدون حساسية حروف ومسافات). الفلتر على `status_2_r_e:'In-Return'` ما اتجرّبش على شوبيفاي حقيقي.
 - الواجهة: كارت `#rqCard` تحت الخطوة ١ (`§RQ-JS`) + زرار «➕ إضافة للمسح» بيعدّي على `addTrackingNumber` (مفيش مسار إضافة تاني). **الجلب عند الدخول وعند «↻ تحديث» بس** — مفيش تحديث تلقائي.
@@ -365,7 +366,7 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
 | ecommoda-order-lifecycle | v1.8.0 (§WHEREABOUTS — راجع بند مفتوح تحت) |
 | shopify-graphql-helper | v1.0.0 |
 
-آخر مطابقة: 25-10-2026 · `index.js` v3.6.0 · `index.html` v3.5
+آخر مطابقة: 26-10-2026 · `index.js` v3.6.1 · `index.html` v3.5
 🔴 معلّقة: **Promote لـ v3.6.0** (حاجز لطابور «راجع من بوسطة» — §READY-RETURN) · **Promote لـ v3.5.1** (حاجز لتفعيل الحارس الديناميكي لقيم اللوج —
 §LOG-REG تحت) · **Promote لـ v3.5.0** (حاجز لكتابة عهدة الطرد — §WHEREABOUTS) ·
 **`WORKER_SECRET` = سر مجموعة `warehouse_ops` → Promote** (حاجز
@@ -531,6 +532,8 @@ SELECT type, json_extract(extra,'$.result') AS res, COUNT(*) n, MAX(timestamp) l
 + `extra._unregistered = true` + UPSERT صامت في `log_value_alerts` — **مفيش
 رفض كتابة أبدًا**. الجدول مشترك على مستوى الستاك ومفروض موجود خلاص، فمفيش
 `CREATE TABLE` في الكود ده.
+
+آخر تحديث: 26-10-2026 — v3.6.1 (`costLog` في `handleReadyReturn` — راجع §READY-RETURN).
 
 آخر تحديث: 25-10-2026 — v3.6.0 (§READY-RETURN — طابور «راجع من بوسطة») + مراجعة جزئية على html-builder v8.5.0 (واجهة v3.5).
 
