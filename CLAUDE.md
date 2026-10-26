@@ -126,6 +126,8 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
 
 ✅ **#51 (سحب عرض الأعمدة):** §COL-RESIZE في `index.html` — نسخة مبسّطة من §TABLE في `core.js` الهب (مقبض في كل `th` · دبل كليك = ضبط على المحتوى · محفوظ في `localStorage` بمفتاح `bosta_returned_scanner_col_widths_v1`). بدون قمع/فلتر client-side (الفلتر `srvLog`). الهب بياخده من `ecoTablesAuto`.
 
+✅ **9A/9B اتشغّلوا 26-10-2026:** `css-check.js` لقى CSS يتيم (بلا selector) من شيل الفلاتر القديمة واتشال؛ `js-undef-check` بيطلّع `setItems()` وهو false positive (method shorthand).
+
 🟡 **بصمة html-builder فضلت `v6.6.0`** لأن المراجعة الكاملة ما خلصتش (البصمة ادعاء بإن الملف اتراجع). «مربع الإدخال الموحّد» (#53) مش منطبق — الأداة بتقبل نوع معرّف واحد (تراكينج بوسطة).
 
 ## 🔴 الاكتشاف الحاكم في مراجعة 07-09-2026 — والإصلاح
