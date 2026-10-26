@@ -1819,7 +1819,7 @@ async function runDiag() {
       d.allOk ? '✅' : '⚠️',
       d.allOk ? 'var(--green)' : 'var(--amber)',
       d.allOk ? 'كل الفحوصات سليمة' : 'فيه فحص أو أكتر محتاج مراجعة',
-      `نسخة الـ Worker: ${d.version} · نسخة الواجهة: ${UI_VERSION}${d.version !== UI_VERSION ? ' ← مختلفين!' : ''}`
+      `نسخة الـ Worker: ${d.version} · نسخة الواجهة: ${TOOL_VERSION}${d.version !== UI_VERSION ? ' ← Worker أقدم من المطلوب!' : ''}`
     );
 
     for (const [key, label] of Object.entries(DIAG_LABELS)) {

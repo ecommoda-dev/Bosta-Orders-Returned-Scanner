@@ -353,7 +353,7 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
 🔴 معلّقة: **Promote لـ v3.6.0** (حاجز لطابور «راجع من بوسطة» — §READY-RETURN) · **Promote لـ v3.5.1** (حاجز لتفعيل الحارس الديناميكي لقيم اللوج —
 §LOG-REG تحت) · **Promote لـ v3.5.0** (حاجز لكتابة عهدة الطرد — §WHEREABOUTS) ·
 **`WORKER_SECRET` = سر مجموعة `warehouse_ops` → Promote** (حاجز
-لصفحة `returned.html` في الهب) · **`runDiag()` بترمي على `UI_VERSION`**
+لصفحة `returned.html` في الهب) 
 
 > `shopify-graphql-helper` و`ecommoda-order-lifecycle` اتضافوا للجدول 05-09-2026:
 > الاتنين دخلوا نظام الإصدارات (قسم أ في `references/skill-registry.md`) وشكّلوا
@@ -377,7 +377,7 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
   تتحدّث، **الكود هنا هو مصدر الحقيقة الفعلي، والمهارة نص متأخر عن قرار حي.**
 - 🔴 **`WORKER_SECRET` = قيمة مجموعة `warehouse_ops` → Promote — حاجز
   لـ`Bosta-Orders-Returned-Scanner.html` في الهب.** فوق في قسم الدمج.
-- 🔴 **`runDiag()` في `index.html` بتاع الريبو ده لسه بترمي** — بتقرا
+- ✅ (اتصلح 26-10-2026: `TOOL_VERSION` + مقارنة بـ`MIN_WORKER_VERSION`) **`runDiag()` في `index.html` كانت بترمي** — بتقرا
   `UI_VERSION` المش موجود، فالفحص الذاتي بيطلّع «فشل الفحص» بدل النتيجة
   **في كل مرة**. الإصلاح سطر واحد (`TOOL_VERSION` بدل `UI_VERSION`)، بس
   الأنضف إنه ياخد نفس معالجة الهب. فوق في قسم الدمج.
