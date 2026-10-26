@@ -2,14 +2,14 @@
 
 # سكانر أوردرات المرتجعات (`Bosta-Orders-Returned-Scanner`)
 
-![version](https://img.shields.io/badge/version-v2.0.0-blue)
+![version](https://img.shields.io/badge/version-v2.1.0-blue)
 
 **بتعمل إيه:** الموظف بيمسح تراكينج نمبر بوسطة لأوردرات راجعة (RTO أو مرتجع بعد
 التسليم)، والأداة بتتحقق من الحالة على شوبيفاي وتحدّث ميتافيلد S1/S2 + تلغي
 الأوردر (مسار RTO) أو تسترجع القطع للمخزون (مسار مرتجع بعد التسليم) **+ تحدّث
 عهدة الطرد لـ `Warehouse` (v3.5.0)**.
 **مين بيستخدمها:** مخزن (استلام المرتجعات).
-**الإصدار:** Worker `v3.5.0` · الواجهة `v3.4`
+**الإصدار:** Worker `v3.6.0` · الواجهة `v3.5`
 
 ## الروابط
 
@@ -28,6 +28,7 @@
 | `diag` | فحص ذاتي كامل (env · CORS · D1 · شوبيفاي + الصلاحيات · LOCATION_ID · بوسطة) — صفر كتابة |
 | `lookup` | بحث بوسطة بالتراكينج + فحص شوبيفاي (S1/S2/returnStatus) + التحقق من صلاحية الانتقال — بدون كتابة |
 | `update` | تنفيذ فعلي: إلغاء الأوردر (RTO) أو استرجاع مخزون (مرتجع بعد التسليم) **+ `package_whereabouts_s1`/`_s2` = `Warehouse` (v3.5.0 · §WHEREABOUTS)** + تحقق بعد التنفيذ + D1 log · وبياخد كمان `rejected[]` فبيسجّلها بـ `type = 'rejected'` **من غير أي تنفيذ** (v3.4.0) |
+| `get_ready_to_return` | **(v3.6.0)** طابور «راجع من بوسطة» — GET، قراءة بحتة: مندوبه `Bosta` + `In-Return` (S1/S2) + `bosta_webhook_status_update_s1/s2` كوده 41. صف لكل ماكينة مستوفية. راجع §READY-RETURN |
 | `get_logs` / `get_logs_count` | تاب السجل — فلترة server-side بقوايم (`employees` · `results` · `machines`) + `search` + `dateFrom`/`dateTo` + **ترتيب server-side** (`sortBy`/`sortDir` بقائمة بيضاء)، صفحة ١٠٠ صف |
 | `get_logs_export` | التصدير — بيرجّع `{ entries, cap, total, truncated }`، مش الصفوف لوحدها |
 
@@ -103,6 +104,41 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
 
 > ومن v3.4.0 المشكلة اتقفلت من المصدر: الصفوف اللي ما لمستش شوبيفاي بقت تحت
 > `type = 'rejected'` مش `update`.
+
+## 📦 §READY-RETURN — طابور «راجع من بوسطة» (v3.6.0 · طلب أحمد 25-10-2026)
+
+> ⚠️ **تعديل Worker — Promote مطلوب.** `WORKER_VERSION` بقى `3.6.0` و`MIN_WORKER_VERSION` في الواجهة بقى `3.6.0`.
+
+الأوردرات اللي بوسطة **بتردّها فعلاً** ومستنية تتسكن: **①** `custom.courier` = `Bosta` · **②** `In-Return` على الماكينة (S1 = `manual_status` · S2 = `status_2_r_e`) · **③** ميتافيلد الـ webhook بتاع **نفس** الماكينة (`custom.bosta_webhook_status_update_s1/s2`) كوده `41` (القيمة المخزّنة `41 · Out For Return`).
+
+- 🔴 **الشروط بتتأكد في الكود مش بالاستعلام بس.** فلتر ميتافيلد مش «filterable» بيتجاهله شوبيفاي في صمت ويرجّع المتجر كله (نفس الفخ الموثّق في الهب لـ`package_whereabouts`). الاستعلام بيضيّق على الحالتين `In-Return`، والكود هو اللي بيحكم. حارس الحلقة: `READY_RETURN_MAX_PAGES = 12` × `READY_RETURN_PAGE = 50` — لو اتضرب بيرجع `truncated: true` والواجهة بتطلّع بانر.
+- أوردر مستوفي الماكينتين بيطلع **صفّين** (`machine: 'S1' | 'S2'`). الرد: `{ ok, orders[], scanned, truncated, serverTime }`.
+- ⛔ **عرض بحت — مش حارس.** الحارس الحقيقي لسه `validateTransition` وقت `lookup`/`update`. الطابور عمره ما يمنع سكان.
+- ⚠️ **مفاتيح لازم تتأكد من أحمد:** `custom.bosta_webhook_last_update_s1/s2` (مخمّنة من اسم الحقل «Bosta Webhook Last Update» — لو غلط عمود «آخر تحديث من بوسطة» بيقول `—` بس) · وقيمة `custom.courier` = `Bosta` حرفيًا (المقارنة بدون حساسية حروف ومسافات). الفلتر على `status_2_r_e:'In-Return'` ما اتجرّبش على شوبيفاي حقيقي.
+- الواجهة: كارت `#rqCard` تحت الخطوة ١ (`§RQ-JS`) + زرار «➕ إضافة للمسح» بيعدّي على `addTrackingNumber` (مفيش مسار إضافة تاني). **الجلب عند الدخول وعند «↻ تحديث» بس** — مفيش تحديث تلقائي.
+- 🔴 **نفس التعديل في `Warehouse-Operations-Center/Bosta-Orders-Returned-Scanner.html` (هب v1.62.0)** — الملفين متطابقين في §TOOL-JS و§RQ-JS، وأي إصلاح لازم يتعمل في الاتنين.
+
+## 🔎 مراجعة الواجهة مقابل `ecommoda-html-builder` v8.5.0 — **جزئية** (25-10-2026)
+
+اتطبّق: توقيت القاهرة بـ`Intl` بدل +٣ ثابتة (**قبل 29-10-2026 تغيير التوقيت الصيفي**) · خروج تلقائي ٦٠ د + خروج يدوي بلا `confirm` (#52) · قفل الدفعة `isUpdating` (#43) · `.tbl-body-wrap` على `grid` (#46) · `--text-secondary`/`--text-muted` = `#4b5563` (#48) · صندوق السكان من غير `placeholder`.
+
+✅ **اتطبّق 26-10-2026:** فلاتر تاب السجل في **رأس العمود** (#47) — نسخة inline من `ecoSrvFilters` (`shared/srv-filters.js` في الهب؛ الأداة ملف واحد فاتنسخ جوّه `index.html`، **وأي إصلاح فيه يتعمل في الاتنين**) · `th` 12px/700 بلا uppercase و`td` 12.5px/600 (#49) · عناوين الجدول `sticky` وسقف سكرول `68vh`. الترتيب (`sortable-th`) لسه شغّال والضغط على القمع مايرتّبش.
+
+✅ **#51 (سحب عرض الأعمدة):** §COL-RESIZE في `index.html` — نسخة مبسّطة من §TABLE في `core.js` الهب (مقبض في كل `th` · دبل كليك = ضبط على المحتوى · محفوظ في `localStorage` بمفتاح `bosta_returned_scanner_col_widths_v1`). بدون قمع/فلتر client-side (الفلتر `srvLog`). الهب بياخده من `ecoTablesAuto`.
+
+✅ **9A/9B اتشغّلوا 26-10-2026:** `css-check.js` لقى CSS يتيم (بلا selector) من شيل الفلاتر القديمة واتشال؛ `js-undef-check` بيطلّع `setItems()` وهو false positive (method shorthand).
+
+✅ **Step 9 كامل اتشغّل بند بند 26-10-2026** على `index.html`: صفر مخالفة غير توست «التصدير اتقص» (كان `error` واتحوّل `warning` في الأداتين). باقي النتايج تعليقات أو شروط موجودة (حارس `isConfigured` · لقطة الدفعة · `performLogout` · `Africa/Cairo` · لا `ar-EG`/`IBM Plex`/hex).
+
+✅ **Step 3/3C/التابات/النوافذ اتراجعوا 26-10-2026:** الهيدر · `.main-tabs-bar` · `.eco-modal` + `.modal-close-x` · سلّم z-index · البادجات الأربعة · نافذة التأكيد بالأرقام · تقسيم ١٠ · الحارس. الثغرة الوحيدة: زرار «إلغاء» في نافذة التأكيد ماكانش هو الافتراضي (فوكس) — اتصلح في الأداتين (`confirmCancelBtn`).
+
+✅ **Step 3B (نافذة عن الأداة) اتراجعت 26-10-2026:** الشِل والـ`details` والأسهم والقسمين سليمين؛ المحتوى اتحدّث (FEATURE MAP: `srvLog` · `§SRV-FILTERS` · `§COL-RESIZE` · `COL_LS` · خطوة الطابور في الـ Workflow) في الأداتين.
+
+✅ **Step 4 (شاشة الدخول) اتراجع 26-10-2026:** `loginAlert` كان جوّه `pin-zone` المخفية فأي خطأ تحميل قائمة الموظفين (CORS/شبكة/سر غلط) كان بيتكتب في عنصر مخفي — اتنقل بره تحت `login-field` (اتأكد بالمتصفح). الباقي (خطوتين · state machine · busy · auto-submit · كيبورد · isActive · shake) سليم. الهب مفيهوش شاشة دخول.
+
+✅ **باقي الخطوات اتراجعت 26-10-2026** (Step 5/6 · معيار الجداول §10 بقياس متصفح · idle-logout · datetime): اتصلّح `text-transform: uppercase` على `thead th` (كان بيناقض #49 رغم ادعاء الإصلاح — الأداتين) · 401 أثناء الجلسة بقى يمر على `performLogout` · الخروج بيفضّي صفوف السجل. بند "widths restored after reload" في اختبار المتصفح متقطّع (~1 من 8) ومش مفسَّر لسه.
+
+🟡 **بصمة html-builder فضلت `v6.6.0`** لأن المراجعة الكاملة ما خلصتش (البصمة ادعاء بإن الملف اتراجع). «مربع الإدخال الموحّد» (#53) مش منطبق — الأداة بتقبل نوع معرّف واحد (تراكينج بوسطة).
 
 ## 🔴 الاكتشاف الحاكم في مراجعة 07-09-2026 — والإصلاح
 
@@ -329,11 +365,11 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
 | ecommoda-order-lifecycle | v1.8.0 (§WHEREABOUTS — راجع بند مفتوح تحت) |
 | shopify-graphql-helper | v1.0.0 |
 
-آخر مطابقة: 24-09-2026 · `index.js` v3.5.1 · `index.html` v3.4
-🔴 معلّقة: **Promote لـ v3.5.1** (حاجز لتفعيل الحارس الديناميكي لقيم اللوج —
+آخر مطابقة: 25-10-2026 · `index.js` v3.6.0 · `index.html` v3.5
+🔴 معلّقة: **Promote لـ v3.6.0** (حاجز لطابور «راجع من بوسطة» — §READY-RETURN) · **Promote لـ v3.5.1** (حاجز لتفعيل الحارس الديناميكي لقيم اللوج —
 §LOG-REG تحت) · **Promote لـ v3.5.0** (حاجز لكتابة عهدة الطرد — §WHEREABOUTS) ·
 **`WORKER_SECRET` = سر مجموعة `warehouse_ops` → Promote** (حاجز
-لصفحة `returned.html` في الهب) · **`runDiag()` بترمي على `UI_VERSION`**
+لصفحة `returned.html` في الهب) 
 
 > `shopify-graphql-helper` و`ecommoda-order-lifecycle` اتضافوا للجدول 05-09-2026:
 > الاتنين دخلوا نظام الإصدارات (قسم أ في `references/skill-registry.md`) وشكّلوا
@@ -357,7 +393,7 @@ git show eed022f1f8bb2a654d8a6b0dd2a9532c7cc27dc0:2.0.html
   تتحدّث، **الكود هنا هو مصدر الحقيقة الفعلي، والمهارة نص متأخر عن قرار حي.**
 - 🔴 **`WORKER_SECRET` = قيمة مجموعة `warehouse_ops` → Promote — حاجز
   لـ`Bosta-Orders-Returned-Scanner.html` في الهب.** فوق في قسم الدمج.
-- 🔴 **`runDiag()` في `index.html` بتاع الريبو ده لسه بترمي** — بتقرا
+- ✅ (اتصلح 26-10-2026: `TOOL_VERSION` + مقارنة بـ`MIN_WORKER_VERSION`) **`runDiag()` في `index.html` كانت بترمي** — بتقرا
   `UI_VERSION` المش موجود، فالفحص الذاتي بيطلّع «فشل الفحص» بدل النتيجة
   **في كل مرة**. الإصلاح سطر واحد (`TOOL_VERSION` بدل `UI_VERSION`)، بس
   الأنضف إنه ياخد نفس معالجة الهب. فوق في قسم الدمج.
@@ -495,6 +531,8 @@ SELECT type, json_extract(extra,'$.result') AS res, COUNT(*) n, MAX(timestamp) l
 + `extra._unregistered = true` + UPSERT صامت في `log_value_alerts` — **مفيش
 رفض كتابة أبدًا**. الجدول مشترك على مستوى الستاك ومفروض موجود خلاص، فمفيش
 `CREATE TABLE` في الكود ده.
+
+آخر تحديث: 25-10-2026 — v3.6.0 (§READY-RETURN — طابور «راجع من بوسطة») + مراجعة جزئية على html-builder v8.5.0 (واجهة v3.5).
 
 آخر تحديث: 25-09-2026 — **صفحة الهب اتسمّت تاني.** رابط الصفحة جوّه
 `Warehouse-Operations-Center` بقى `Bosta-Orders-Returned-Scanner.html` بدل
