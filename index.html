@@ -758,6 +758,10 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
         <div class="login-status warn" id="loginStatus">الإعدادات غير مكتملة — افتح الإعدادات أولاً.</div>
       </div>
 
+      <!-- ⚠️ بره pin-zone (Step 4): pin-zone مخفية في الخطوة ١، وأي خطأ تحميل قائمة
+           الموظفين (CORS / شبكة / سر غلط) كان هيتكتب في عنصر مخفي -->
+      <div class="login-alert" id="loginAlert"></div>
+
       <div class="pin-zone" id="pinZone">
         <div class="pin-label" id="pinLabel">أدخل الـ PIN</div>
 
@@ -782,8 +786,6 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
           <button class="pin-key" onclick="pressPinKey('0')">0</button>
           <button class="pin-key utility" onclick="pressPinKey('back')">←</button>
         </div>
-
-        <div class="login-alert" id="loginAlert"></div>
 
         <button class="login-primary visible" id="loginPrimaryBtn"
                 onclick="handlePrimaryLoginAction()" disabled>دخول</button>
