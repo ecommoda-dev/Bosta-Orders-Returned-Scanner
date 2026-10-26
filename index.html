@@ -1689,8 +1689,8 @@ function diagLine(icon, color, title, detail) {
   return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);">
     <span style="flex:0 0 auto;">${icon}</span>
     <div style="flex:1;">
-      <div style="font-weight:600;color:${color};">${title}</div>
-      ${detail ? `<div style="color:var(--text-secondary);font-size:11px;">${detail}</div>` : ''}
+      <div style="font-weight:600;color:${color};">${esc(title)}</div>
+      ${detail ? `<div style="color:var(--text-secondary);font-size:11px;">${esc(detail)}</div>` : ''}
     </div></div>`;
 }
 
