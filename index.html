@@ -482,6 +482,17 @@ th.flt-on .th-flt { color: var(--accent); background: var(--accent-light); borde
 .chips-zone { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
 .chips-zone[hidden] { display: none; }
 .chips-rows { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+/* §COL-RESIZE — سحب عرض أعمدة جدول السجل (Standards #51) — نسخة مبسّطة من §TABLE في core.js بتاع الهب */
+.log-table thead th { position: sticky; }
+.log-table.col-fixed { table-layout: fixed; }
+.log-table.col-fixed th, .log-table.col-fixed td { overflow: hidden; overflow-wrap: anywhere; white-space: normal; }
+.col-rz { position: absolute; top: 0; bottom: 0; inset-inline-end: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 3; }
+.col-rz::after { content: ''; position: absolute; top: 24%; bottom: 24%; inset-inline-end: 3px; width: 2px; border-radius: 2px; background: var(--border-strong); transition: background .12s, top .12s, bottom .12s; }
+.col-rz:hover::after, .col-rz.active::after { background: var(--accent); top: 8%; bottom: 8%; }
+body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
+.col-w-badge { position: fixed; z-index: 800; top: 12px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--text-primary); color: var(--surface); padding: 4px 12px; border-radius: 99px; font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
+.log-table.col-measure th, .log-table.col-measure td { white-space: nowrap !important; }
 .sortable-th { cursor: pointer; user-select: none; transition: background .12s, color .12s; }
 .sortable-th:hover  { background: var(--accent-light); color: var(--accent-dark); }
 .sortable-th.sorted { background: var(--accent-light); color: var(--accent-dark); }
@@ -3616,6 +3627,90 @@ function onLogFilterChange() { logCurrentPage = 1; clearExportWarn(); fetchLog()
 // فرق ساعتين/تلاتة ممكن يحط عملية بعد ٩ مساءً في يوم UTC اللي بعده. مقبول لفلتر بالأيام، بس موثّق.
 function logParams() { return srvLog.params(); }
 
+
+// ══════════════════════════════════════════════════════════════
+// §COL-RESIZE — سحب عرض الأعمدة (Standards #51)
+// ══════════════════════════════════════════════════════════════
+// العرض مابيتغيّرش لحد أول سحب (بيجمّد العروض على قياسها الحالي)، ودبل كليك = ضبط على أطول محتوى.
+// محفوظ في localStorage كتفضيل شاشة (مش بيانات). المقبض جوّه <th> عليه onclick للترتيب
+// فالضغطة عليه ماتوصلش للترتيب. نسخة مبسّطة من §TABLE في الهب — مفيش قمع هنا (srvLog هو الفلتر).
+const COL_LS = 'bosta_returned_scanner_col_widths_v1', COL_MIN = 64, COL_MAX = 700;
+const colTable = () => document.querySelector('#tab-log .log-table');
+const colHeads = (t) => [...t.querySelectorAll('thead th')];
+let colW = null, colDrag = null, colBadge = null;
+function colSave() { try { localStorage.setItem(COL_LS, JSON.stringify(colW)); } catch (_) {} }
+function colApply(t) {
+  let cg = t.querySelector(':scope > colgroup.col-cg');
+  const heads = colHeads(t);
+  if (!cg || cg.children.length !== heads.length) {
+    if (cg) cg.remove();
+    cg = document.createElement('colgroup'); cg.className = 'col-cg';
+    cg.innerHTML = '<col>'.repeat(heads.length); t.insertBefore(cg, t.firstChild);
+  }
+  const wrap = t.parentElement;
+  const sum = colW.reduce((a, b) => a + b, 0), slack = Math.max(0, wrap.clientWidth - sum);
+  let tot = 0;
+  [...cg.children].forEach((c, i) => { const w = colW[i] + (i === heads.length - 1 ? slack : 0); c.style.width = w + 'px'; tot += w; });
+  t.style.width = tot + 'px'; t.classList.add('col-fixed');
+}
+function colFreeze(t) {
+  if (colW) return true;
+  const heads = colHeads(t);
+  if (!heads[0] || !heads[0].getBoundingClientRect().width) return false;
+  colW = heads.map(h => Math.max(COL_MIN, Math.floor(h.getBoundingClientRect().width)));
+  colApply(t); return true;
+}
+function colInit() {
+  const t = colTable(); if (!t) return;
+  colHeads(t).forEach(th => {
+    const h = document.createElement('span'); h.className = 'col-rz'; h.setAttribute('aria-hidden', 'true'); th.appendChild(h);
+  });
+  try {
+    const s = JSON.parse(localStorage.getItem(COL_LS) || 'null');
+    if (Array.isArray(s) && s.length === colHeads(t).length && s.every(n => n >= COL_MIN)) { colW = s; colApply(t); }
+  } catch (_) {}
+}
+document.addEventListener('pointerdown', (e) => {
+  const h = e.target.closest && e.target.closest('.col-rz'); if (!h || e.button) return;
+  const t = colTable(); if (!t || !colFreeze(t)) return;
+  e.preventDefault(); e.stopPropagation();
+  const i = colHeads(t).indexOf(h.closest('th'));
+  if (i === colW.length - 1) colW[i] += Math.max(0, t.parentElement.clientWidth - colW.reduce((a, b) => a + b, 0));
+  colDrag = { t, i, x: e.clientX, w: colW[i], sign: getComputedStyle(t).direction === 'rtl' ? -1 : 1, h };
+  try { h.setPointerCapture(e.pointerId); } catch (_) {}
+  h.classList.add('active'); document.body.classList.add('col-resizing');
+  colBadge = document.createElement('div'); colBadge.className = 'col-w-badge'; colBadge.textContent = colDrag.w + ' px'; document.body.appendChild(colBadge);
+});
+document.addEventListener('pointermove', (e) => {
+  if (!colDrag) return;
+  const d = colDrag; colW[d.i] = Math.max(COL_MIN, Math.min(COL_MAX, Math.round(d.w + d.sign * (e.clientX - d.x))));
+  colApply(d.t); colBadge.textContent = colW[d.i] + ' px';
+});
+function colEnd() {
+  if (!colDrag) return;
+  colDrag.h.classList.remove('active'); document.body.classList.remove('col-resizing'); colDrag = null;
+  if (colBadge) { colBadge.remove(); colBadge = null; }
+  colSave();
+}
+document.addEventListener('pointerup', colEnd); document.addEventListener('pointercancel', colEnd);
+document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('.col-rz')) { e.stopPropagation(); e.preventDefault(); } }, true);
+// دبل كليك = ضبط على أطول محتوى — القياس بـ Range على المحتوى مش على الخلية (قياس الخلية بيدّي عرض العمود الحالي)
+document.addEventListener('dblclick', (e) => {
+  const h = e.target.closest && e.target.closest('.col-rz'); if (!h) return;
+  const t = colTable(); if (!t || !colFreeze(t)) return;
+  const th = h.closest('th'), i = colHeads(t).indexOf(th);
+  t.classList.add('col-measure');
+  const hr = document.createRange(); hr.setStart(th, 0); hr.setEndBefore(h);
+  let w = hr.getBoundingClientRect().width + 36;
+  t.querySelectorAll('tbody tr').forEach(tr => {
+    const td = tr.children[i]; if (!td || tr.children.length !== colW.length) return;
+    const r = document.createRange(); r.selectNodeContents(td); w = Math.max(w, r.getBoundingClientRect().width + 16);
+  });
+  t.classList.remove('col-measure');
+  colW[i] = Math.max(COL_MIN, Math.min(COL_MAX, Math.ceil(w))); colApply(t); colSave();
+});
+window.addEventListener('resize', () => { const t = colTable(); if (t && colW) colApply(t); });
+
 // ─── §LOG-JS::الترتيب — مستقل تمامًا عن الفلاتر ───
 const sortConfig = {
   date: { type: 'date' }, time: { type: 'date' }, emp: { type: 'string' },
@@ -4025,6 +4120,7 @@ document.addEventListener('click', e => {
 
   // فلاتر السجل (srvLog) — قائمة الموظفين بتتملي من get_employees في loadEmployeesList()
   updateSortHeaderUI();
+  colInit();
 
   buildTabChipMenu();
   updateTabChip();
