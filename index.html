@@ -1233,7 +1233,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
       <div class="confirm-note" id="confirmNote"></div>
     </div>
     <div class="eco-modal-ftr">
-      <button class="btn btn-outline" onclick="resolveConfirm(false)">إلغاء</button>
+      <button class="btn btn-outline" id="confirmCancelBtn" onclick="resolveConfirm(false)">إلغاء</button>
       <button class="btn btn-red" id="confirmOkBtn" onclick="resolveConfirm(true)">تأكيد التنفيذ</button>
     </div>
   </div>
@@ -2625,6 +2625,8 @@ function askConfirm({ header, lead, lines = [], note = '', okLabel = 'تأكيد
   document.getElementById('confirmNote').innerHTML   = note;
   document.getElementById('confirmOkBtn').textContent = okLabel;
   document.getElementById('confirmOverlay').classList.add('open');
+  // الافتراضي = الإلغاء (Step 3C): Enter بالغلط مايلغيش أوردرات نهائيًا
+  document.getElementById('confirmCancelBtn').focus();
   return new Promise(res => { _confirmResolve = res; });
 }
 
