@@ -267,7 +267,7 @@ body {
 /* ── Table ── */
 .table-wrap { overflow-x: auto; direction: ltr; }
 table { width: 100%; border-collapse: collapse; direction: ltr; }
-thead th { text-align: center; padding: 10px 14px; background: var(--surface-2); border-bottom: 2px solid var(--border); font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+thead th { text-align: center; padding: 10px 14px; background: var(--surface-2); border-bottom: 2px solid var(--border); font-size: 12px; font-weight: 700; color: var(--accent); white-space: nowrap; }
 thead th.col-check { width: 38px; }
 thead th, tbody td { border-inline-start: 1px solid var(--border); }
 thead th:first-child, tbody td:first-child { border-inline-start: none; }
@@ -1612,6 +1612,12 @@ async function apiRequest(url, opts) {
   let data;
   try { data = JSON.parse(text); }
   catch { throw new Error(`رد غير متوقع من الـ Worker (HTTP ${resp.status}): ${text.slice(0, 160)}`); }
+  // 401 أثناء جلسة شغّالة (سر اتغيّر/اتدوّر) = نفس مسار الخروج (idle-logout.md §٤).
+  // الحارس `currentEmployee`: performLogout بتصفّره قبل ما ردّ log_logout يرجع، فمفيش تكرار.
+  if (resp.status === 401 && currentEmployee) {
+    performLogout('manual');
+    throw new Error('الجلسة انتهت أو السر غير صحيح (401) — سجّل الدخول من جديد');
+  }
   if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
   return data;
 }
@@ -2264,6 +2270,7 @@ function performLogout(reason) {
   closeResultModal();
   resolveConfirm(false);
   rqReset();
+  logRows = []; logTotalCount = 0; renderLogTable();   // أسماء موظفين/أوردرات السجل ماتفضلش على شاشة مهجورة
   // ─────────────────────────────────────────────────────────────────────────
 }
 
