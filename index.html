@@ -3938,7 +3938,7 @@ async function exportLogXLSX() {
         + (data.total != null ? ` من أصل <b>${data.total.toLocaleString('en-US')}</b> مطابقين للفلاتر` : '')
         + `. ضيّق الفترة أو الفلاتر وصدّر على دفعات.`;
       warn.style.display = '';
-      showToast(`⚠️ التصدير اتقص عند ${entries.length.toLocaleString('en-US')} صف — الملف مش كامل`, 'error', 7000);
+      showToast(`⚠️ التصدير اتقص عند ${entries.length.toLocaleString('en-US')} صف — الملف مش كامل`, 'warning', 7000);
     } else {
       showToast(`تم تصدير ${entries.length.toLocaleString('en-US')} عملية ✓`, 'success');
     }

@@ -128,6 +128,8 @@ SELECT COUNT(*) as total, MAX(timestamp) as last_ts FROM logs WHERE tool = 'meta
 
 ✅ **9A/9B اتشغّلوا 26-10-2026:** `css-check.js` لقى CSS يتيم (بلا selector) من شيل الفلاتر القديمة واتشال؛ `js-undef-check` بيطلّع `setItems()` وهو false positive (method shorthand).
 
+✅ **Step 9 كامل اتشغّل بند بند 26-10-2026** على `index.html`: صفر مخالفة غير توست «التصدير اتقص» (كان `error` واتحوّل `warning` في الأداتين). باقي النتايج تعليقات أو شروط موجودة (حارس `isConfigured` · لقطة الدفعة · `performLogout` · `Africa/Cairo` · لا `ar-EG`/`IBM Plex`/hex).
+
 🟡 **بصمة html-builder فضلت `v6.6.0`** لأن المراجعة الكاملة ما خلصتش (البصمة ادعاء بإن الملف اتراجع). «مربع الإدخال الموحّد» (#53) مش منطبق — الأداة بتقبل نوع معرّف واحد (تراكينج بوسطة).
 
 ## 🔴 الاكتشاف الحاكم في مراجعة 07-09-2026 — والإصلاح
