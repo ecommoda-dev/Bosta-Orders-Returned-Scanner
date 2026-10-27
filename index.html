@@ -518,11 +518,12 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .rq-ready-badge { background: var(--green); }
 #rqBody tr.rq-ready { background: #bbf7d0; }
 #rqBody tr.rq-ready .badge-success { background: #fff; }
-#rqBody tr.rq-hl { background: var(--amber-light); outline: 2px solid var(--amber); outline-offset: -2px; }
 .rq-fail ul { margin: 6px 0 0; padding-inline-start: 20px; }
 .rq-fail li { margin-bottom: 3px; }
 /* ٧ أعمدة: حشو أضيق وبادج العمر تحت التاريخ — عشان عمود «إجراء» مايتقصّش برّه الشاشة */
 #rqTableWrap thead th, #rqTableWrap tbody td { padding-inline: 8px; }
+/* جدول «راجع من بوسطة» RTL: رقم الأوردر أقصى اليمين وإجراء أقصى اليسار (باقي الجداول لسه ltr) */
+#rqTableWrap, #rqTableWrap table { direction: rtl; }
 #rqBody .rq-time { display: block; margin: 3px 0 0; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); }
 #rqBody .rq-trk { font-weight: 800; color: var(--text-primary); }
 
@@ -866,6 +867,12 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
             <span class="num" id="rqReadyCount">0</span>
             <span class="lbl">جاهزة</span>
           </div>
+          <!-- 🔴 `.btn-red` مش `.btn-primary` (v1.25.0) — الزرار ده بيلغي أوردرات **إلغاء لا رجعة فيه**.
+          اللون هنا **معنى مش ثيم**، فاتثبّت على الأحمر صراحةً.
+          ⚠️ وفيه بند في `docs/scanners-check.mjs` بيقرا خلفيته المحسوبة ولازم تفضل `rgb(220,38,38)`. -->
+          <button class="btn btn-red" id="updateBtn" onclick="startUpdate()" disabled>
+            ↩ تحديث شوبيفاي
+          </button>
         </div>
         <div style="display:flex;gap:10px;align-items:center;">
           <span class="rq-stamp" id="rqStamp"></span>
@@ -884,14 +891,6 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
           />
         </div>
 
-        <div class="action-bar">
-          <!-- 🔴 `.btn-red` مش `.btn-primary` (v1.25.0) — الزرار ده بيلغي أوردرات **إلغاء لا رجعة فيه**.
-               اللون هنا **معنى مش ثيم**، فاتثبّت على الأحمر صراحةً.
-               ⚠️ وفيه بند في `docs/scanners-check.mjs` بيقرا خلفيته المحسوبة ولازم تفضل `rgb(220,38,38)`. -->
-          <button class="btn btn-red" id="updateBtn" onclick="startUpdate()" disabled>
-            ↩ تحديث شوبيفاي
-          </button>
-        </div>
 
         <div id="updateProgress" style="display:none;">
           <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-bottom:4px;">
@@ -2337,6 +2336,18 @@ let isUpdating = false;
 // اتلزقوا في رقم واحد، وباركود اتقرا نص قراية.
 const TN_MIN_LEN = 8, TN_MAX_LEN = 13;
 
+// تنظيف مدخل السكانر: بعض الملصقات بتطلّع بادئة قبل الرقم (`آ-05-7718739964` · `n-05-7718739964`)
+// والباركود الصحيح هو `7718739964` بس. بناخد **آخر مجموعة أرقام** (البادئة `05` أقصر من TN_MIN_LEN).
+// ⛔ لو فيه أكتر من مجموعة بطول TN_MIN_LEN فأكتر = باركودين اتلزقوا → بنرجّع الأرقام كلها متلزقة
+//    عشان حارس الطول في addTrackingNumber يرفضها برسالته المعروفة بدل ما نختار واحد في صمت.
+function cleanTrackingInput(raw) {
+  const s = String(raw).replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660));
+  const runs = s.match(/\d+/g) || [];
+  const long = runs.filter(r => r.length >= TN_MIN_LEN);
+  if (long.length > 1) return runs.join('');
+  return long.length ? long[0] : (runs.length ? runs[runs.length - 1] : '');
+}
+
 // ══════════════════════════════════════════════════════════════
 // §TOOL-JS::rqDone — الأرقام اللي اتنفّذت (بتتشال من الجدول)
 // ══════════════════════════════════════════════════════════════
@@ -2423,19 +2434,11 @@ function rqMark(i, opts = {}) {
   const o = rqState.orders[i];
   o.sel = true; o.res = null;
   rqRender();
-  if (opts.reveal) {
-    const tr = document.getElementById(`rqRow-${i}`);
-    if (tr) {
-      tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      tr.classList.add('rq-hl');
-      setTimeout(() => tr.classList.remove('rq-hl'), 1600);
-    }
-  }
 }
 
 async function addTrackingNumber(num) {
   if (isUpdating) { showToast('فيه دفعة بتتنفّذ دلوقتي — استنى لحد ما تخلص', 'warning'); return; }
-  const clean = String(num).replace(/\D/g, '');
+  const clean = cleanTrackingInput(num);
   if (!clean) { showToast('رقم التتبع يجب أن يحتوي على أرقام فقط', 'error'); playBeep('warn'); return; }
   if (clean.length < TN_MIN_LEN || clean.length > TN_MAX_LEN) {
     showToast(
