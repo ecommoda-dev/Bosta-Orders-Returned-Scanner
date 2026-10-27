@@ -513,14 +513,16 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .pill.neutral .pill-val { color: var(--text-secondary); }
 .did-line { font-size: 10.5px; color: var(--text-secondary); line-height: 1.5; margin-top: 3px; }
 
-/* ── v3.4 — بانر إعادة الاستعلام قبل الكتابة ── */
-.recheck-banner {
-  margin: 0; padding: 11px 14px; border-radius: 9px;
-  background: var(--amber-light); border: 1.5px solid var(--amber-border);
-  color: var(--amber-dark); font-size: 12.5px; font-weight: 600; line-height: 1.8;
-}
-.recheck-banner ul { margin: 6px 0 0; padding-inline-start: 20px; }
-.recheck-banner li { margin-bottom: 3px; }
+/* ── v3.6 — شاشة واحدة: أدوات السكان + حالة الصف في الجدول ── */
+.rq-tools { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.rq-ready-badge { background: var(--green); }
+#rqBody tr.rq-ready { background: var(--green-light); }
+#rqBody tr.rq-hl { background: var(--amber-light); outline: 2px solid var(--amber); outline-offset: -2px; }
+.rq-fail ul { margin: 6px 0 0; padding-inline-start: 20px; }
+.rq-fail li { margin-bottom: 3px; }
+/* ٩ أعمدة: حشو أضيق وبادج العمر تحت التاريخ — عشان عمود «إجراء» مايتقصّش برّه الشاشة */
+#rqTableWrap thead th, #rqTableWrap tbody td { padding-inline: 8px; }
+#rqBody .rq-age { display: block; margin: 3px 0 0; }
 
 /* ── Idle logout (§IDLE-JS) — banner + login notice · Standards #52 ── */
 .idle-warn {
@@ -846,25 +848,35 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
        ══════════════════════════════════════════════════════ -->
   <div id="tab-scanner" class="tab-panel active">
 
-    <!-- Step 1: Scan -->
-    <div class="card" id="step1Card">
+    <!-- ══ §TOOL::rq — شاشة واحدة: السكان + طابور «راجع من بوسطة» ══
+         الأوردرات اللي بوسطة بتردّها فعلاً: المندوب Bosta + الحالة In-Return (S1 أو S2)
+         + ميتافيلد الـ webhook = «41 · Out For Return». الحكم كله في الـ Worker
+         (`get_ready_to_return`) والصفحة بتعرض اللي راجع بالحرف.
+         🔴 (v3.6) مفيش خطوة «استعلام بوسطة»: الجدول هو حارس السكان — الشحنة اللي مش فيه
+         بتترفض. الصف بيبدأ «⏳ في انتظار التسجيل» وبيبقى «✅ جاهزة للتحديث» بالسكان أو
+         «إضافة للمسح»، وبعدين «تحديث شوبيفاي». -->
+    <div class="card" id="rqCard">
       <div class="card-header">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-          <h2>الخطوة 1 — مسح أرقام التتبع</h2>
+          <div>
+            <h2>📦 راجع من بوسطة — امسح الشحنة أو اضغط «إضافة للمسح»</h2>
+            <div class="rq-sub">مندوبه بوسطة · In-Return · حالة بوسطة <bdi dir="ltr">41 · Out For Return</bdi></div>
+          </div>
           <div class="counter-badge">
-            <span class="num" id="scanCount">0</span>
+            <span class="num" id="rqCount">—</span>
             <span class="lbl">أوردر</span>
           </div>
+          <div class="counter-badge rq-ready-badge">
+            <span class="num" id="rqReadyCount">0</span>
+            <span class="lbl">جاهزة</span>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn btn-outline btn-sm" id="toggleStep1Btn" onclick="toggleStep1()" style="display:none;">+ إضافة المزيد</button>
-          <button class="btn btn-danger btn-sm" onclick="clearScans()">مسح الكل</button>
-          <button class="btn btn-primary" id="lookupBtn" onclick="startLookup()" disabled>
-            🔎 استعلام بوسطة
-          </button>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span class="rq-stamp" id="rqStamp"></span>
+          <button class="btn btn-outline btn-sm" id="rqRefreshBtn" onclick="rqLoad(false)">↻ تحديث</button>
         </div>
       </div>
-      <div id="step1Body" class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div class="rq-tools">
         <div class="scanner-row">
           <input
             id="scanInput"
@@ -876,79 +888,15 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
           />
           <button class="btn btn-outline" onclick="addManual()">يدوي</button>
         </div>
-        <div id="scanList">
-          <div class="empty-state"><div class="icon">🔍</div><div>لم يتم مسح أي أرقام بعد</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ §TOOL::rq — طابور «راجع من بوسطة» ══
-         الأوردرات اللي بوسطة بتردّها فعلاً: المندوب Bosta + الحالة In-Return (S1 أو S2)
-         + ميتافيلد الـ webhook = «41 · Out For Return». الحكم كله في الـ Worker
-         (`get_ready_to_return`) والصفحة بتعرض اللي راجع بالحرف.
-         ⛔ عرض بحت — مش حارس: أوردر مش هنا لسه بيتسكن والـ Worker هو اللي بيحكم. -->
-    <div class="card" id="rqCard" style="margin-top:16px;">
-      <div class="card-header">
-        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-          <div>
-            <h2>📦 راجع من بوسطة</h2>
-            <div class="rq-sub">مندوبه بوسطة · In-Return · حالة بوسطة <bdi dir="ltr">41 · Out For Return</bdi></div>
-          </div>
-          <div class="counter-badge">
-            <span class="num" id="rqCount">—</span>
-            <span class="lbl">أوردر</span>
-          </div>
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;">
-          <span class="rq-stamp" id="rqStamp"></span>
-          <button class="btn btn-outline btn-sm" id="rqRefreshBtn" onclick="rqLoad(false)">↻ تحديث</button>
-        </div>
-      </div>
-      <div id="rqFail" class="rq-fail" style="display:none;"></div>
-      <div id="rqTrunc" class="rq-warn" style="display:none;"></div>
-      <div id="rqEmpty" class="empty-state"><div class="icon">⏳</div><div>جاري الاستعلام عن الأوردرات برجاء الانتظار ...</div></div>
-      <div class="table-wrap" id="rqTableWrap" style="display:none;">
-        <table>
-          <thead>
-            <tr>
-              <th>رقم الأوردر</th>
-              <th>العميل</th>
-              <th>رقم التتبع</th>
-              <th>نوع الراجع</th>
-              <th>حالة بوسطة</th>
-              <th>آخر تحديث من بوسطة</th>
-              <th>تاريخ الأوردر</th>
-              <th>إجراء</th>
-            </tr>
-          </thead>
-          <tbody id="rqBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Step 2: Results -->
-    <div class="card" id="resultsCard" style="display:none;margin-top:16px;">
-      <div class="card-header">
-        <h2>الخطوة 2 — النتائج</h2>
-        <div id="resultsSummaryPills" class="summary-pills"></div>
-      </div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-
-        <!-- v3.2.0 — بانر أخطاء بوسطة/شوبيفاي. قبل كده أي فشل في نداء بوسطة كان
-             بيتحول لـ "غير موجود ببوسطة" على كل الأرقام من غير أي إشارة للسبب. -->
-        <div id="lookupAlert" style="display:none;"></div>
-
-        <!-- ─── §TOOL::recheckBanner — بيتملى من recheckBeforeUpdate ─── -->
-        <div id="recheckBanner" class="recheck-banner" style="display:none;"></div>
 
         <div class="action-bar">
-          <label class="select-all-label">
-            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)" />
-            تحديد الكل (المتوافقة فقط)
-          </label>
-          <button class="btn btn-primary" id="updateBtn" onclick="startUpdate()" disabled>
+          <!-- 🔴 `.btn-red` مش `.btn-primary` (v1.25.0) — الزرار ده بيلغي أوردرات **إلغاء لا رجعة فيه**.
+               اللون هنا **معنى مش ثيم**، فاتثبّت على الأحمر صراحةً.
+               ⚠️ وفيه بند في `docs/scanners-check.mjs` بيقرا خلفيته المحسوبة ولازم تفضل `rgb(220,38,38)`. -->
+          <button class="btn btn-red" id="updateBtn" onclick="startUpdate()" disabled>
             ↩ تحديث شوبيفاي
           </button>
+          <button class="btn btn-danger btn-sm" onclick="clearScans()">مسح التعليم</button>
           <div style="margin-right:auto;">
             <button class="btn btn-outline btn-sm" onclick="exportResultsXLSX()">📥 تصدير XLSX</button>
           </div>
@@ -961,24 +909,29 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
           </div>
           <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
         </div>
+      </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="col-check"><input type="checkbox" id="selectAllHead" onchange="toggleSelectAll(this.checked)"></th>
-                <th>رقم الأوردر</th>
-                <th>رقم التتبع</th>
-                <th>نوع بوسطة</th>
-                <th>حالة بوسطة</th>
-                <th>الحالة الحالية</th>
-                <th>التحديث المطلوب</th>
-                <th>تحديث شوبيفاي</th>
-              </tr>
-            </thead>
-            <tbody id="resultsBody"></tbody>
-          </table>
-        </div>
+      <div id="rqFail" class="rq-fail" style="display:none;"></div>
+      <div id="rqTrunc" class="rq-warn" style="display:none;"></div>
+      <div id="rqConflict" class="rq-fail" style="display:none;"></div>
+      <div id="rqEmpty" class="empty-state"><div class="icon">⏳</div><div>جاري الاستعلام عن الأوردرات برجاء الانتظار ...</div></div>
+      <div class="table-wrap" id="rqTableWrap" style="display:none;">
+        <table>
+          <thead>
+            <tr>
+              <th>رقم الأوردر</th>
+              <th>العميل</th>
+              <th>رقم التتبع</th>
+              <th>نوع الراجع</th>
+              <th>حالة بوسطة</th>
+              <th>آخر تحديث من بوسطة</th>
+              <th>تاريخ الأوردر</th>
+              <th>النتيجة</th>
+              <th>إجراء</th>
+            </tr>
+          </thead>
+          <tbody id="rqBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -1105,11 +1058,12 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 
           <h4>كيف تعمل — Workflow</h4>
           <ol>
-            <li>الموظف يمسح أرقام تتبع بوسطة (سكانر أو يدوي) — أو يضغط «➕ إضافة للمسح» من طابور «راجع من بوسطة» (عرض بحت، مش حارس)</li>
-            <li>الأداة تستعلم بوسطة، وتجيب S1/S2/returnStatus من شوبيفاي لكل أوردر</li>
-            <li>تتحقق من جدول القرار (تحت) وتعرض النتيجة — متوافق أو مرفوض مع السبب</li>
-            <li>الموظف يراجع ويحدد الأوردرات المتوافقة، ثم يضغط "تحديث شوبيفاي"</li>
-            <li>الأداة تعيد التحقق دفاعيًا لحظة الكتابة، ثم تنفذ لكل أوردر لوحده</li>
+            <li>الجدول «راجع من بوسطة» بيتجاب من شوبيفاي (من غير أي نداء لبوسطة) وكل صف بيبدأ <b>⏳ في انتظار التسجيل</b></li>
+            <li>الموظف يمسح رقم التتبع (سكانر أو يدوي) أو يضغط «➕ إضافة للمسح» — الصف يبقى <b>✅ جاهزة للتحديث</b>. رقم مش في الجدول <b>بيترفض</b></li>
+            <li>أوردر ظاهر في الطابور مرتين أو رقم تتبع متكرر = <b>⛔ تعارض</b>: الصفوف دي بتترفض وبيتعرض السبب فوق الجدول قبل أي سكان</li>
+            <li>الموظف يضغط "تحديث شوبيفاي" ← نافذة تأكيد بالأثر (كام إلغاء نهائي · كام استرجاع مخزون)</li>
+            <li>الـ Worker يعيد التحقق من شوبيفاي الحي لكل أوردر ويوقف اللي حالته اتغيّرت، وينفّذ الباقي واحد واحد</li>
+            <li>اللي اتنفّذ بنجاح بيتشال من الجدول، والفشل والتحذير بيفضلوا ظاهرين بالسبب، والطابور بيتحدّث تلقائي</li>
           </ol>
 
           <h4>منطق القرار (Decision Table)</h4>
@@ -1162,12 +1116,12 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
           <h4>FEATURE MAP</h4>
           <ul>
             <li><code>§STYLES</code> — توكنز <code>:root</code> (الثيم الأحمر = override للـ accent بس) + كل CSS</li>
-            <li><code>§TOOL-JS::refreshRow</code> / <code>mergeLookupResults</code> — إعادة الاستعلام بتستبدل الصف مش بتتخطّاه</li>
-            <li><code>§TOOL-JS::recheckBeforeUpdate</code> — إعادة استعلام إجبارية قبل أي تنفيذ + بانر "اتغيّر إيه"</li>
+            <li><code>§TOOL-JS::rqRows</code> (<code>rqIngest</code> · <code>rqDetectConflicts</code>) — صفوف الجدول + حالتها المحلية (<code>sel</code> · <code>res</code> · <code>conflict</code>)؛ التعارض = أوردر أو رقم تتبع متكرر في الطابور</li>
+            <li><code>§TOOL-JS::rqDone</code> — الأوردر اللي اتنفّذ بيتستبعد من أي جلب ١٠ دقايق (الفهرس بتاع شوبيفاي مش فوري)</li>
+            <li><code>§TOOL-JS::scan</code> (<code>addTrackingNumber</code>) — مسار واحد للسكان والتعليم؛ الرقم اللي مش في الجدول بيترفض بعد إعادة جلب واحدة لو الجدول أقدم من دقيقة</li>
             <li><code>§TOOL-JS::confirmDanger</code> (<code>askConfirm</code>) — نافذة تأكيد بتسمّي الأثر (كام إلغاء نهائي · كام استرجاع مخزون)</li>
-            <li><code>§TOOL-JS::chunkedUpdate</code> — تقسيم الدفعة على مجموعات ١٠ + تقدّم حقيقي + نزع سلاح الصف (<code>doneInSession</code>)</li>
+            <li><code>§TOOL-JS::chunkedUpdate</code> — تقسيم الدفعة على مجموعات ١٠ + تقدّم حقيقي + نزع سلاح الصف (<code>sel=false</code> + <code>rqDone</code>)</li>
             <li><code>§TOOL-JS::resultModal</code> — نافذة ملخّص ما بعد التنفيذ (خمس حالات + تفاصيل المرفوض و"خلاص متعمل" في قايمتين منفصلتين)</li>
-            <li><code>§TOOL-JS::pendingRejected</code> — المرفوض اللي لسه ما اتسجلش بالسبب ده (حارس التكرار في السجل)</li>
             <li><code>§UPDATE::logRejectedItems</code> (Worker) — إعادة تحقق من المرفوض وقت التسجيل + صف D1 بنوع <code>rejected</code></li>
             <li><code>§CONFIG::esc</code> — تهريب أي نص جاي من بوسطة/شوبيفاي قبل ما يتحط في innerHTML</li>
             <li><code>§SHELL</code> / <code>§SHELL-JS</code> — الهيدر وشريط التابات جوّه <code>.sticky-header-wrap</code> (Freeze on Scroll بعتبة <b>مقيسة</b>) + chip التاب + النوافذ + التوست + حارس نسخة الـ Worker</li>
@@ -1175,9 +1129,9 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
             <li><code>§CONFIG</code> — <code>TOOL_VERSION</code> · <code>MIN_WORKER_VERSION</code> · روابط الـ Workers كـ constants · <code>apiGet</code>/<code>apiPost</code> · صيغ التاريخ الموحّدة</li>
             <li><code>§DIAG-JS</code> — زرار الفحص الذاتي (<code>?action=diag</code>) في الإعدادات</li>
             <li><code>§SCAN</code> — سكانر جن + إضافة يدوية لأرقام التتبع</li>
-            <li><code>§RQ-JS</code> — طابور «راجع من بوسطة» (<code>rqLoad</code> · <code>rqRender</code> · <code>rqAddRow</code>): عرض بحت بصفر فلترة محلية، وبيجيب عند الدخول وعند «↻ تحديث» بس</li>
+            <li><code>§RQ-JS</code> — طابور «راجع من بوسطة» = جدول الأداة (<code>rqLoad</code> · <code>rqRender</code> · <code>rqToggle</code>): الحكم في الـ Worker، والجدول هو حارس السكان</li>
             <li><code>§IDLE-JS</code> — خروج تلقائي بعد ٦٠ دقيقة عدم نشاط (وقت فعلي · بانر تحذير · واقف أثناء الدفعة) · <code>performLogout(reason)</code></li>
-            <li><code>§TOOL-JS</code> — <code>lookup</code> · جدول النتائج · <code>startUpdate</code> (٣ حالات) · تصدير النتائج</li>
+            <li><code>§TOOL-JS</code> — <code>startUpdate</code> (٣ حالات) · تصدير النتائج · <code>§RQ-JS</code> الجدول</li>
             <li><code>§LOG-JS</code> — تاب السجل: القسم الموحّد (فلاتر في رأس العمود <code>srvLog</code> + ترتيب ٣ حالات + صف النتائج) و pagination وتصدير XLSX ببانر التقصّ</li>
             <li><code>§SRV-FILTERS</code> — <code>ecoSrvFilters</code>: نسخة inline من <code>shared/srv-filters.js</code> في الهب (قوايم/نص/تاريخ، الفلتر server-side عبر <code>params()</code>) — أي إصلاح فيه يتعمل في الاتنين</li>
             <li><code>§COL-RESIZE</code> — سحب عرض الأعمدة (مقبض في كل <code>th</code> · دبل كليك = ضبط على المحتوى · محفوظ في <code>localStorage</code>)</li>
@@ -1189,7 +1143,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
             <li><code>TOOL_NAME = 'bosta_return'</code> — قيمة <code>tool</code> لأحداث الدخول/الخروج فقط</li>
             <li><code>extra.sourceTool = 'bosta_orders_returned_scanner'</code> — يفلتر سجل هذه الأداة داخل <code>tool = 'metafields_change'</code> المشترك</li>
             <li><code>TOOL_VERSION</code> — مصدر <b>واحد</b> لرقم نسخة الواجهة، بيتقرا منه زرار الهيدر وبادج الـ Changelog ونص شاشة الدخول عبر <code>renderVersionUI()</code></li>
-            <li><code>doneInSession</code> — علامة على الصف اللي اتنفّذ في الجلسة دي؛ بتمنع إعادة إرساله وبتتحافظ عليها عبر إعادة الاستعلام</li>
+            <li><code>rqDone</code> (<code>sessionStorage</code>) — الأوردرات اللي اتنفّذت؛ بتمنع ظهورها تاني في الجدول وإعادة إرسالها (١٠ دقايق)</li>
             <li><code>extra.result</code> — <code>success</code> / <code>warning</code> / <code>error</code> / <code>rejected</code> / <code>already</code></li>
             <li><code>extra.stage</code> — للصف المرفوض: <code>lookup</code> أو <code>write</code> (كان متوافق واتوقف وقت التنفيذ — سباق بين موظفين)</li>
             <li><code>TN_MIN_LEN</code> / <code>TN_MAX_LEN</code> — حدود طول رقم التتبع (٨–١٣)</li>
@@ -1279,6 +1233,18 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
       <div class="cl-version-block">
         <div class="cl-version-row">
           <span class="cl-ver-badge" id="clLatestBadge">v—</span>
+          <span class="cl-ver-date">27-10-2026</span>
+        </div>
+        <ul class="cl-items">
+          <li class="cl-item"><span class="cl-tag new">جديد</span> <b>شاشة واحدة بدل خطوتين.</b> اتشالت «الخطوة 1 — استعلام بوسطة» و«الخطوة 2 — النتائج»: الجدول «راجع من بوسطة» هو اللي بيتسكن عليه، وعمود <b>«النتيجة»</b> جديد (<b>⏳ في انتظار التسجيل</b> ← <b>✅ جاهزة للتحديث</b> بالسكان أو «إضافة للمسح»)، وبعدها «تحديث شوبيفاي». <b>مفيش أي استعلام من بوسطة خالص.</b> رقم تتبع مش في الجدول بيترفض</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> <b>⛔ تعارض:</b> أوردر ظاهر في الطابور بمسارين، أو رقم تتبع متكرر، بيتعرض فوق الجدول قبل السكان وصفوفه بتترفض</li>
+          <li class="cl-item"><span class="cl-tag new">جديد</span> اللي اتنفّذ بنجاح بيتشال من الجدول والطابور بيتحدّث تلقائي بعد التنفيذ (من غير ما الأوردر يرجع بسبب تأخّر فهرس شوبيفاي). نوع شحنة بوسطة بيظهر <code>—</code> في السجل الجديد</li>
+        </ul>
+      </div>
+
+      <div class="cl-version-block">
+        <div class="cl-version-row">
+          <span class="cl-ver-badge old">v3.5</span>
           <span class="cl-ver-date">25-10-2026</span>
         </div>
         <ul class="cl-items">
@@ -1447,7 +1413,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 // مصدر **واحد** لرقم نسخة الواجهة — بيتقرا منه زرار الهيدر وبادج الـ Changelog
 // ونص شاشة الدخول عن طريق renderVersionUI(). ممنوع كتابته hardcoded في أكتر
 // من مكان (٣ نصوص بتتزامن يدويًا = باج "الرقم متفرّق").
-const TOOL_VERSION = '3.5';
+const TOOL_VERSION = '3.6';
 
 // أقل نسخة Worker الواجهة دي بتشتغل معاها. v3.3.0 هي اللي ضافت
 // `get_logs_export` بعقد { cap, total, truncated } وفلاتر السجل كقوايم —
@@ -2262,11 +2228,6 @@ function performLogout(reason) {
   // ⚠️ v3.4 — قايمة المسح والنتايج كانت **بتفضل في الذاكرة بعد الخروج**، فموظف
   //    تاني بيدخل على نفس الجهاز كان بيلاقي جدول جاهز فيه أوردرات مختارة من
   //    الجلسة اللي قبله — وضغطة واحدة كانت هتنفّذها باسمه هو.
-  scannedNums = [];
-  resultsData = [];
-  renderScanList();
-  document.getElementById('lookupBtn').disabled = true;
-  resetToStep1();
   closeResultModal();
   resolveConfirm(false);
   rqReset();
@@ -2382,19 +2343,114 @@ function addManual() {
 // ══════════════════════════════════════════════════════════════
 
 // ─── §TOOL-JS::state ───
-let scannedNums = [];
-let resultsData = [];
-// Standards #43 — قفل أثناء تنفيذ الدفعة: اللوب شغّال على لقطة (items) لكن resultsData
-// بتتقرا بالـ indexOf، فإضافة/حذف رقم في النص كان بيلخبط الصف اللي بيتلوّن.
+// 🔴 شاشة واحدة: الجدول (طابور «راجع من بوسطة») هو المصدر الوحيد للأوردرات. مفيش خطوة
+//    «استعلام بوسطة» — الشحنة اللي مش في الجدول **بتترفض** والـ Worker هو اللي بيحكم وقت
+//    التنفيذ (`validateTransition` على شوبيفاي الحي). مفيش أي نداء لبوسطة من الواجهة.
+// Standards #43 — قفل أثناء تنفيذ الدفعة (بيتقري كمان في `shellIsBusy` تحت).
 let isUpdating = false;
 
 // ─── §SCAN::TN_LEN — حارس الطول ───
 // أرقام تتبع بوسطة بين ٨ و١٣ رقم. بيمسك الحالتين اللي بيحصلوا فعلاً: باركودين
-// اتلزقوا في رقم واحد، وباركود اتقرا نص قراية. من غيره الرقم الغلط كان بيدخل
-// القايمة ويرجع "غير موجود ببوسطة" — رسالة كاذبة على شحنة موجودة.
+// اتلزقوا في رقم واحد، وباركود اتقرا نص قراية.
 const TN_MIN_LEN = 8, TN_MAX_LEN = 13;
 
-function addTrackingNumber(num) {
+// ══════════════════════════════════════════════════════════════
+// §TOOL-JS::rqDone — الأرقام اللي اتنفّذت (بتتشال من الجدول)
+// ══════════════════════════════════════════════════════════════
+// ⚠️ الطابور بيتقري من فهرس بحث شوبيفاي، والفهرس **مش فوري** (نفس فخّ §JUST-PRINTED في
+//    الطباعة): الأوردر اللي لسه اتلغى ممكن يرجع في الجلب اللي بعده بثواني وهو شكله
+//    «في انتظار التسجيل». عشان كده الأوردر اللي اتنفّذ بيتحفظ هنا ١٠ دقايق وبيتستبعد من
+//    أي جلب. الاتجاه الآمن: بعد السقف بيرجع يتعرض بدل ما يفضل مخفي للأبد.
+const RQ_DONE_KEY = 'bosta_returned_done_v1';
+const RQ_DONE_TTL_MS = 10 * 60 * 1000;
+function rqRowKey(o) { return `${String(o.orderName || '').replace(/^#/, '')}|${o.machine || ''}`; }
+function rqDoneLoad() {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(RQ_DONE_KEY) || '{}'), now = Date.now(), out = {};
+    for (const k of Object.keys(raw)) if (now - raw[k] < RQ_DONE_TTL_MS) out[k] = raw[k];
+    return out;
+  } catch { return {}; }
+}
+let rqDone = rqDoneLoad();
+function rqDoneSave() { try { sessionStorage.setItem(RQ_DONE_KEY, JSON.stringify(rqDone)); } catch {} }
+function rqDoneMark(o) { rqDone[rqRowKey(o)] = Date.now(); rqDoneSave(); }
+function rqIsDone(o) {
+  const k = rqRowKey(o), t = rqDone[k];
+  if (!t) return false;
+  if (Date.now() - t >= RQ_DONE_TTL_MS) { delete rqDone[k]; rqDoneSave(); return false; }
+  return true;
+}
+
+// ══════════════════════════════════════════════════════════════
+// §TOOL-JS::rqRows — صفوف الجدول + حالتها المحلية
+// ══════════════════════════════════════════════════════════════
+// الصف = رد الـ Worker زي ما هو + حقلين محلييّن:
+//   `sel` — اتعلّم «جاهزة للتحديث» (سكان أو زرار «إضافة للمسح»)
+//   `res` — نتيجة آخر تنفيذ { status, failReason, detail } (فشل/تحذير بس بيفضلوا ظاهرين)
+//   `conflict` — سبب التعارض (نص) لو الصف مش هينفع يتنفّذ
+// الحالة الأولية لكل صف: sel=false → «⏳ في انتظار التسجيل».
+function rqIngest(list, prev) {
+  const prevByKey = new Map((prev || []).map(o => [rqRowKey(o), o]));
+  const rows = [];
+  for (const o of list) {
+    if (rqIsDone(o)) continue;
+    const old = prevByKey.get(rqRowKey(o));
+    rows.push({ ...o, sel: !!(old && old.sel), res: (old && old.res) || null, conflict: null });
+  }
+  // صف التحذير (اتنفّذ بس محتاج عين الموظف) بيفضل ظاهر ومقفول لحد «تمت المراجعة»
+  for (const old of (prev || [])) {
+    if (old.res && old.res.status === 'warning' && !rows.some(r => rqRowKey(r) === rqRowKey(old))) rows.unshift(old);
+  }
+  rqDetectConflicts(rows);
+  return rows;
+}
+
+// 🔴 تعارض = الأوردر ظاهر في الطابور أكتر من مرة (مسارين S1 وS2 مع بعض) أو رقم التتبع
+//    متكرر. الحالتين شبه مستحيلتين (مسار S1 بيشترط S2 فاضي ومسار S2 بيشترط S1 = Delivered)،
+//    فلو حصلت يبقى فيه بيانات متلخبطة على شوبيفاي — **الصفوف كلها بتترفض** والسبب بيتعرض
+//    في بانر فوق الجدول وفي عمود «النتيجة» قبل أي سكان. إلغاء أوردر مرتين مفيش رجوع فيه.
+function rqDetectConflicts(rows) {
+  const live = rows.filter(r => !(r.res && r.res.status === 'warning'));
+  live.forEach(r => { r.conflict = null; });
+  const mark = (keyFn, msg) => {
+    const groups = new Map();
+    for (const r of live) { const k = keyFn(r); if (k) { if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); } }
+    for (const [k, g] of groups) if (g.length > 1) g.forEach(r => { r.conflict = r.conflict || msg(k, g); });
+  };
+  const m = x => (x.machine === 'S2' ? '[S-2]' : 'S1');
+  mark(r => String(r.orderName || '').replace(/^#/, ''),
+       (k, g) => `الأوردر #${k} ظاهر في الطابور ${g.length} مرات (${g.map(m).join(' + ')}) — بيانات متلخبطة على شوبيفاي، راجعه يدويًا`);
+  mark(r => (r.tracking ? String(r.tracking) : ''),
+       (k, g) => `رقم التتبع ${k} متكرر على ${g.length} صفوف (${g.map(x => x.orderName).join(' · ')}) — راجعهم يدويًا`);
+  live.forEach(r => { if (r.conflict) r.sel = false; });
+}
+
+function rqToUpdate() {
+  return rqState.orders.filter(r => r.sel && !r.conflict && r.tracking && !(r.res && r.res.status === 'warning'));
+}
+
+// ══════════════════════════════════════════════════════════════
+// §TOOL-JS::scan — السكان والتعليم (مسار واحد لسكان الباركود وزرار «إضافة للمسح»)
+// ══════════════════════════════════════════════════════════════
+function rqFind(tn) {
+  return rqState.orders.filter(o => o.tracking && String(o.tracking) === tn);
+}
+
+function rqMark(i, opts = {}) {
+  const o = rqState.orders[i];
+  o.sel = true; o.res = null;
+  rqRender();
+  if (opts.reveal) {
+    const tr = document.getElementById(`rqRow-${i}`);
+    if (tr) {
+      tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      tr.classList.add('rq-hl');
+      setTimeout(() => tr.classList.remove('rq-hl'), 1600);
+    }
+  }
+}
+
+async function addTrackingNumber(num) {
   if (isUpdating) { showToast('فيه دفعة بتتنفّذ دلوقتي — استنى لحد ما تخلص', 'warning'); return; }
   const clean = String(num).replace(/\D/g, '');
   if (!clean) { showToast('رقم التتبع يجب أن يحتوي على أرقام فقط', 'error'); playBeep('warn'); return; }
@@ -2406,219 +2462,61 @@ function addTrackingNumber(num) {
       'warning', 6000);
     playBeep('warn'); return;
   }
-  if (scannedNums.includes(clean)) { showToast(`${clean} موجود بالفعل`, 'error'); playBeep('warn'); return; }
-  scannedNums.push(clean);
-  renderScanList();
-  document.getElementById('lookupBtn').disabled = false;
+
+  // الطابور لسه بيتحمّل = الرد بيعتمد عليه، فنستناه بدل ما نرفض رفض كاذب
+  if (rqState.loading) await rqLoadP;
+  let hits = rqFind(clean);
+  // مش في الجدول وكاش الجدول أقدم من دقيقة → إعادة جلب **واحدة** من شوبيفاي قبل الرفض
+  // (الشحنة ممكن تكون وصلت بعد آخر جلب). مفيش نداء بوسطة.
+  if (!hits.length && (!rqState.at || Date.now() - rqState.at.getTime() > 60 * 1000)) {
+    showToast('الرقم مش في الجدول — بحدّث الطابور من شوبيفاي…', 'neutral', 2500);
+    await rqLoad(true);
+    hits = rqFind(clean);
+  }
+
+  if (!hits.length) {
+    showToast(`الشحنة ${clean} مش في جدول «راجع من بوسطة» — مش هتتسجّل. لو لسه واصلة اضغط «تحديث» وجرّب تاني.`, 'error', 7000);
+    playBeep('warn'); return;
+  }
+  const bad = hits.find(h => h.conflict);
+  if (bad) {
+    showToast(`⛔ ${clean} مرفوضة — ${bad.conflict}`, 'error', 9000);
+    playBeep('warn'); return;
+  }
+  const o = hits[0];
+  if (o.res && o.res.status === 'warning') { showToast(`${clean} اتنفّذت في الجلسة دي — راجع الملاحظة في الجدول`, 'warning'); playBeep('warn'); return; }
+  if (o.sel) { showToast(`${clean} موجود بالفعل`, 'error'); playBeep('warn'); return; }
+  rqMark(rqState.orders.indexOf(o), { reveal: true });
   playBeep('scan');
 }
 
-function removeScanned(num) {
+// زرار الصف: تعليم / إلغاء التعليم
+function rqToggle(i) {
   if (isUpdating) { showToast('فيه دفعة بتتنفّذ دلوقتي — استنى لحد ما تخلص', 'warning'); return; }
-  scannedNums = scannedNums.filter(n => n !== num);
-  // الجدول بيعكس قايمة المسح — صف لرقم اتشال ماينفعش يفضل معروض ولا مختار
-  resultsData = resultsData.filter(r => r.trackingNumber !== num);
-  renderScanList();
-  document.getElementById('lookupBtn').disabled = scannedNums.length === 0;
-  if (scannedNums.length === 0) resetToStep1(); else renderResults();
+  const o = rqState.orders[i];
+  if (!o || !o.tracking || o.conflict) return;
+  if (o.sel) { o.sel = false; rqRender(); }
+  else { rqMark(i); playBeep('scan'); }
+  scanInputEl?.focus();
 }
 
+// «تمت المراجعة» على صف التحذير — بيتشال من الجدول
+function rqDismiss(i) {
+  if (isUpdating) return;
+  const o = rqState.orders[i];
+  if (!o) return;
+  rqState.orders.splice(i, 1);
+  rqDetectConflicts(rqState.orders);
+  rqRender();
+  scanInputEl?.focus();
+}
+
+// «مسح التعليم» — بيرجّع كل الصفوف «في انتظار التسجيل» (مابيشيلش صفوف من الجدول)
 function clearScans() {
   if (isUpdating) { showToast('فيه دفعة بتتنفّذ دلوقتي — استنى لحد ما تخلص', 'warning'); return; }
-  scannedNums = []; resultsData = [];
-  renderScanList();
-  document.getElementById('lookupBtn').disabled = true;
-  resetToStep1();
-}
-
-function resetToStep1() {
-  document.getElementById('resultsCard').style.display = 'none';
-  document.getElementById('step1Body').style.display = 'flex';
-  document.getElementById('toggleStep1Btn').style.display = 'none';
-  // بانر قديم على استعلام جديد = تضليل
-  const a = document.getElementById('lookupAlert');
-  if (a) { a.style.display = 'none'; a.innerHTML = ''; }
-  clearRecheckBanner();
-}
-
-function toggleStep1() {
-  const body = document.getElementById('step1Body');
-  const btn  = document.getElementById('toggleStep1Btn');
-  const isHidden = body.style.display === 'none';
-  body.style.display = isHidden ? 'flex' : 'none';
-  btn.textContent = isHidden ? '▲ إخفاء' : '+ إضافة المزيد';
-  if (isHidden) scanInputEl.focus();
-}
-
-function renderScanList() {
-  const el = document.getElementById('scanList');
-  document.getElementById('scanCount').textContent = scannedNums.length.toLocaleString('en-US');
-  if (scannedNums.length === 0) {
-    el.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><div>لم يتم مسح أي أرقام بعد</div></div>`;
-    return;
-  }
-  el.innerHTML = `<div class="scan-list">${
-    scannedNums.map((n, i) => `
-      <div class="scan-chip">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="color:var(--text-muted);font-size:12px;font-family:var(--font-mono);">${i + 1}</span>
-          <span class="scan-chip-num">${n}</span>
-        </div>
-        <button class="scan-chip-del" onclick="removeScanned('${n}')" title="حذف">×</button>
-      </div>`).join('')
-  }</div>`;
-}
-
-// ─── §TOOL-JS::refreshRow — إعادة الاستعلام بتستبدل الصف، مش بتتخطّاه ───
-// ⚠️ v3.4 — قبل كده كان `if (!existingTNs.has(tn)) merged.push(r)` — يعني الرقم
-// الموجود في الجدول **بياخد رد جديد من الـ Worker ويترمى في الزبالة**. الزرار
-// بيدوّر ويطلّع "استُعلم عن ٦٣ رقم" والصف بيفضل عارض حالة اتقرأت من ٢٠ دقيقة.
-// ده حرفيًا الباج اللي `bosta-orders-shipped-scanner` أصلحه في v3.3 وكاتب عنه
-// إنه «أخطر شكل من أشكال النجاح الكاذب» — والجملة دي اتكتبت عن أداة بتكتب
-// ميتافيلد، بينما الأداة دي **بتلغي أوردرات**.
-//
-// نتيجة كتابة سابقة (`shopifyStatus`/`updateDetail`/`doneInSession`) بتتحافظ
-// عليها: دي سجل لفعل حصل، مش حالة بتتقرا من شوبيفاي.
-function refreshRow(old, fresh) {
-  const row = { ...fresh, shopifyStatus: null, failReason: null, updateDetail: null,
-                selected: fresh.found && fresh.valid };
-  if (!old) return row;
-  row.shopifyStatus = old.shopifyStatus || null;
-  row.failReason    = old.failReason    || null;
-  row.updateDetail  = old.updateDetail  || null;
-  row.updateResult  = old.updateResult  || null;
-  // "اتنفّذ في الجلسة دي" فعل حصل — إعادة الاستعلام مابتنزعش العلامة، وإلا
-  // الصف يرجع مرشّح للتنفيذ تاني.
-  row.doneInSession = old.doneInSession;
-  row.rejectLoggedReason = old.rejectLoggedReason;
-  row.rejectLogged       = old.rejectLogged;
-  row.rejectLogError     = old.rejectLogError;
-  // إلغاء اختيار صريح من الموظف بيتحافظ عليه؛ صف كان مرفوض وبقى متوافق بيتحدّد
-  row.selected = fresh.found && fresh.valid && !old.doneInSession
-                 && ((old.found && old.valid) ? !!old.selected : true);
-  return row;
-}
-
-// بتحدّث الصفوف اللي رجعت في الرد وبتضيف الجديد — الصفوف اللي مش في الرد
-// بتفضل زي ما هي (الاستعلام الجزئي قبل الكتابة بيستعلم عن المختار بس).
-function mergeLookupResults(fresh) {
-  const freshByTN = new Map((fresh || []).map(r => [String(r.trackingNumber), r]));
-  const seen = new Set();
-  const out  = resultsData.map(old => {
-    seen.add(old.trackingNumber);
-    const nr = freshByTN.get(old.trackingNumber);
-    return nr ? refreshRow(old, nr) : old;
-  });
-  for (const nr of (fresh || [])) {
-    if (!seen.has(String(nr.trackingNumber))) out.push(refreshRow(null, nr));
-  }
-  return out;
-}
-
-// ─── §TOOL-JS::lookup ───
-async function startLookup() {
-  const cfg = getConfig();
-  if (!cfg.url || !cfg.secret) { showToast('يرجى ضبط الإعدادات أولاً', 'error'); openSettings(); return; }
-
-  const btn = document.getElementById('lookupBtn');
-  btn.disabled = true;
-  btn.innerHTML = `<div class="spinner"></div> جاري الاستعلام...`;
-
-  try {
-    const data  = await apiPost('lookup', { trackingNumbers: scannedNums });
-    const fresh = data.results || [];
-
-    // v3.2.0 — أخطاء بوسطة/شوبيفاي بقت تظهر صراحةً بدل ما تتحول لـ"غير موجود"
-    renderLookupAlert(data.bostaErrors || [], data.shopifyError || null);
-
-    const knownTNs  = new Set(resultsData.map(r => r.trackingNumber));
-    const reQueried = fresh.filter(r => knownTNs.has(String(r.trackingNumber))).length;
-
-    // الجدول بيعكس قائمة المسح الحالية بالظبط — صف لرقم اتشال من القايمة
-    // (ومحدش بيقدر يحدّثه) ماينفعش يفضل معروض.
-    const scannedSet = new Set(scannedNums);
-    resultsData = mergeLookupResults(fresh).filter(r => scannedSet.has(r.trackingNumber));
-
-    clearRecheckBanner();
-    renderResults();
-    document.getElementById('resultsCard').style.display = '';
-    document.getElementById('step1Body').style.display = 'none';
-    document.getElementById('toggleStep1Btn').style.display = '';
-    document.getElementById('toggleStep1Btn').textContent = '+ إضافة المزيد';
-
-    const already  = fresh.filter(r => r.found && !r.valid &&  r.already).length;
-    const rejected = fresh.filter(r => r.found && !r.valid && !r.already).length;
-    const failedTN = fresh.filter(r => r.bostaFailed).length;
-    showToast(
-      `استُعلم عن ${fresh.length} رقم`
-        + (reQueried ? ` (منهم ${reQueried} إعادة استعلام)` : '')
-        + (already  ? ` — خلاص متعمل: ${already}` : '')
-        + (rejected ? ` — مرفوض: ${rejected}` : '')
-        + (failedTN ? ` — تعذّر الاستعلام: ${failedTN}` : '')
-        + ` — الإجمالي: ${resultsData.length}`,
-      (rejected || failedTN) ? 'error' : 'success'
-    );
-  } catch (err) {
-    showToast(`خطأ: ${err.message}`, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '🔎 استعلام بوسطة';
-  }
-}
-
-// ══════════════════════════════════════════════════════════════
-// §TOOL-JS::recheckBeforeUpdate — إعادة استعلام إجبارية قبل الكتابة
-// ══════════════════════════════════════════════════════════════
-// الـ Worker بيعيد التحقق وقت التنفيذ فعلاً — لكن ده بيوقف الفعل الغلط **بعد**
-// ما الموظف ضغط، ورسالته بتوصل كصف أحمر وسط النتيجة. الفحص ده بيحصل **قبل**:
-// بيعيد الاستعلام، بيحدّث الجدول، وبيوقف الدفعة كلها لو أي صف مختار اتغيّر أو
-// ما اتأكدش. الموظف يشوف الجديد بعينه ويضغط تاني بإرادته.
-// ⚠️ الحجّة دي أقوى هنا منها في أداة الشحن بمراحل: هناك الكتابة ميتافيلد يترجع،
-//    وهنا **الإلغاء مفيش ميوتيشن بيرجّعه**.
-// ⚠️ تغيّر حالة بوسطة لوحده **مش** سبب إيقاف: القرار متوقّف على S1/S2/returnStatus
-//    بس، والإيقاف على حاجة مالهاش أثر بيولّد تحذير كاذب متكرر.
-async function recheckBeforeUpdate(rows) {
-  const data      = await apiPost('lookup', { trackingNumbers: rows.map(r => r.trackingNumber) });
-  const fresh     = data.results || [];
-  const freshByTN = new Map(fresh.map(r => [String(r.trackingNumber), r]));
-
-  const blocked = [];
-  for (const r of rows) {
-    const label = { trackingNumber: r.trackingNumber, businessRef: r.businessRef };
-    const nr    = freshByTN.get(r.trackingNumber);
-
-    if (!nr)            { blocked.push({ ...label, reason: 'ما رجعش في إعادة الاستعلام — الحالة غير مؤكَّدة' }); continue; }
-    if (nr.bostaFailed) { blocked.push({ ...label, reason: 'تعذّر الاستعلام من بوسطة — الحالة غير مؤكَّدة' });  continue; }
-    if (!nr.found)      { blocked.push({ ...label, reason: 'مابقاش موجود على بوسطة' });                        continue; }
-    if (!nr.valid)      { blocked.push({ ...label, reason: nr.rejectReason || (nr.already ? 'خلاص اترجّع' : 'بقى مرفوض') }); continue; }
-
-    const diffs = [];
-    if ((nr.s1 || '')           !== (r.s1 || ''))           diffs.push(`S1: ${r.s1 || '—'} → ${nr.s1 || '—'}`);
-    if ((nr.s2 || '')           !== (r.s2 || ''))           diffs.push(`[S-2]: ${r.s2 || '—'} → ${nr.s2 || '—'}`);
-    if ((nr.returnStatus || '') !== (r.returnStatus || '')) diffs.push(`returnStatus: ${r.returnStatus || '—'} → ${nr.returnStatus || '—'}`);
-    if ((nr.machine || '')      !== (r.machine || ''))      diffs.push(`المسار: ${r.machine || '—'} → ${nr.machine || '—'}`);
-    if (diffs.length) blocked.push({ ...label, reason: 'الحالة اتغيّرت — ' + diffs.join(' · ') });
-  }
-
-  // الجدول بياخد الجديد قبل أي حكم — الموظف بيبص على الحالة الحالية مش القديمة
-  resultsData = mergeLookupResults(fresh);
-  return blocked;
-}
-
-function renderRecheckBanner(blocked) {
-  const box = document.getElementById('recheckBanner');
-  box.innerHTML =
-      `<div>⚠️ <b>ما اتنفّذ ولا أوردر.</b> إعادة الاستعلام قبل التنفيذ لقت `
-    + `${blocked.length.toLocaleString('en-US')} أوردر حالته اتغيّرت أو ما اتأكدتش من آخر استعلام:</div>`
-    + `<ul>${blocked.map(b => `<li><b>${esc(b.businessRef || b.trackingNumber)}</b> — ${esc(b.reason)}</li>`).join('')}</ul>`
-    + `<div style="margin-top:6px;">الجدول اتحدّث بآخر حالة، والصفوف اللي بقت مش صالحة اتشالت من الاختيار. راجع، وبعدين اضغط "تحديث شوبيفاي" تاني للباقي.</div>`;
-  box.style.display = '';
-}
-
-function clearRecheckBanner() {
-  const box = document.getElementById('recheckBanner');
-  if (!box) return;
-  box.style.display = 'none'; box.innerHTML = '';
+  rqState.orders.forEach(o => { o.sel = false; });
+  rqRender();
+  scanInputEl?.focus();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2646,116 +2544,6 @@ function resolveConfirm(ok) {
   document.getElementById('confirmOverlay').classList.remove('open');
   const r = _confirmResolve; _confirmResolve = null;
   if (r) r(ok);
-}
-
-// ─── §TOOL-JS::renderResults ───
-const STATE_MAP_COLORS = {
-  45: 'badge-success', 46: 'badge-warn',
-  47: 'badge-danger', 48: 'badge-danger', 49: 'badge-danger',
-};
-
-// v3.2.0 — بانر يوضّح أي فشل في نداءات بوسطة/شوبيفاي بدل ما يتخفى في النتائج
-function renderLookupAlert(bostaErrors, shopifyError) {
-  const el = document.getElementById('lookupAlert');
-  if (!el) return;
-  const msgs = [];
-  if (bostaErrors.length) msgs.push(`<b>تعذّر الاستعلام من بوسطة:</b> ${esc([...new Set(bostaErrors)].join(' · '))}`);
-  if (shopifyError)       msgs.push(`<b>تعذّر الاتصال بشوبيفاي:</b> ${esc(shopifyError)}`);
-  if (!msgs.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  el.style.display = '';
-  el.innerHTML = `<div style="background:var(--red-light);border:1.5px solid var(--red-border);color:var(--red);
-    border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;line-height:1.7;">
-    ⚠️ ${msgs.join('<br>')}<br>
-    <span style="color:var(--text-secondary);">الأرقام المتأثرة اتعلّمت بـ"تعذّر الاستعلام" — دي <u>مش</u> معناها إن الشحنة مش موجودة.</span>
-    </div>`;
-}
-
-function renderResults() {
-  const tbody = document.getElementById('resultsBody');
-  const notFound = resultsData.filter(r => !r.found && !r.bostaFailed).length;
-  const valid    = resultsData.filter(r => r.found && r.valid).length;
-  // ⚠️ "خلاص اترجّع" اتفصل عن "مرفوض" — دي كانت ٥٩ من ٦١ صف فشل في السجل،
-  //    وخلطها مع الرفض كان بيخلي الموظف يعدّي على العمود كله.
-  const already  = resultsData.filter(r => r.found && !r.valid &&  r.already).length;
-  const rejected = resultsData.filter(r => r.found && !r.valid && !r.already).length;
-  const failed   = resultsData.filter(r => r.bostaFailed).length;
-
-  document.getElementById('resultsSummaryPills').innerHTML = `
-    <div class="pill"><span class="pill-val">${resultsData.length}</span><span class="pill-lbl">إجمالي</span></div>
-    <div class="pill success"><span class="pill-val">${valid}</span><span class="pill-lbl">متوافق</span></div>
-    ${already > 0   ? `<div class="pill neutral"><span class="pill-val">${already}</span><span class="pill-lbl">خلاص متعمل</span></div>` : ''}
-    ${rejected > 0  ? `<div class="pill" style="border-color:var(--amber-border);"><span class="pill-val" style="color:var(--amber);">${rejected}</span><span class="pill-lbl">مرفوض</span></div>` : ''}
-    ${failed > 0    ? `<div class="pill danger"><span class="pill-val">${failed}</span><span class="pill-lbl">تعذّر الاستعلام</span></div>` : ''}
-    ${notFound > 0 ? `<div class="pill danger"><span class="pill-val">${notFound}</span><span class="pill-lbl">غير موجود ببوسطة</span></div>` : ''}
-  `;
-
-  tbody.innerHTML = resultsData.map((r, i) => {
-    const stateCls   = STATE_MAP_COLORS[r.stateCode] || 'badge-blue';
-    const stateLabel = r.state || '—'; // معلومة بس من بوسطة — لا تؤثر على قرار التحديث
-    const shopifyCell  = getShopifyCell(r.shopifyStatus, r.failReason, r.updateDetail);
-    const orderDisplay = r.found
-      ? orderLink(r.businessRef, r.orderId)
-      // ⚠️ v3.2.0 — التفرقة بين "بوسطة قالت مش موجود" و"إحنا ما قدرناش نسأل"
-      : (r.bostaFailed
-          ? `<span class="badge badge-warn" title="${(r.bostaError || '').replace(/"/g, '')}">تعذّر الاستعلام</span>`
-          : `<span class="badge badge-danger">غير موجود</span>`);
-    const typeDisplay  = r.orderType ? `<span class="badge badge-neutral">${esc(r.orderType)}</span>` : `<span class="badge badge-neutral">—</span>`;
-    const currentStateCell = getCurrentStateCell(r);
-    const targetCell       = getTargetCell(r);
-    // صف "خلاص اتعمل" **مش** أحمر — مفيش حاجة غلط فيه.
-    const rowClass         = (r.found && !r.valid && !r.already) ? 'row-rejected' : '';
-
-    return `
-      <tr id="row-${i}" class="${rowClass}">
-        <td class="col-check">
-          <input type="checkbox" id="chk-${i}"
-            ${r.selected ? 'checked' : ''}
-            ${(!r.found || !r.valid || r.doneInSession) ? 'disabled' : ''}
-            onchange="onRowCheck(${i}, this.checked)" />
-        </td>
-        <td>${orderDisplay}</td>
-        <td><span class="tracking-num">${esc(r.trackingNumber)}</span></td>
-        <td>${typeDisplay}</td>
-        <td><span class="badge ${stateCls}">${esc(stateLabel)}</span></td>
-        <td>${currentStateCell}</td>
-        <td>${targetCell}</td>
-        <td id="shopify-cell-${i}">${shopifyCell}</td>
-      </tr>`;
-  }).join('');
-
-  updateUpdateBtn();
-}
-
-// الحالة الحالية على شوبيفاي — S1 دايمًا معروض، وS2 معاه لو موجود
-function getCurrentStateCell(r) {
-  if (!r.found) return `<span class="badge badge-neutral">—</span>`;
-  const s1Badge = `<span class="badge ${statusBadgeClass(r.s1)}">S1: ${esc(r.s1 || '—')}</span>`;
-  if (!r.s2) return s1Badge;
-  const s2Badge = `<span class="badge ${statusBadgeClass(r.s2)}">[S-2]: ${esc(r.s2)}</span>`;
-  return `${s1Badge} ${s2Badge}`;
-}
-
-// التحديث المطلوب — بادج الهدف لو valid، أو "مرفوض" + سبب الرفض المفصّل
-// v3.1.0: كل مسار معاه أكشن شوبيفاي إضافي (إلغاء الأوردر لمسار RTO، استرجاع
-// المخزون لمسار المرتجع بعد التسليم) — بيظهر كسطر صغير تحت البادج عشان
-// الموظف يعرف مقدمًا إيه اللي هيحصل فعليًا لما يضغط "تحديث شوبيفاي".
-function getTargetCell(r) {
-  if (!r.found) return `<span class="badge badge-neutral">—</span>`;
-  if (r.valid) {
-    const label      = r.machine === 'S1' ? 'S1 → Returned' : '[S-2] → Returned';
-    const sideEffect  = r.machine === 'S1'
-      ? '+ إلغاء الأوردر على شوبيفاي'
-      : '+ استرجاع المخزون';
-    return `<span class="badge ${statusBadgeClass('Returned')}">${label}</span>`
-      + `<br><span class="reject-reason" style="color:var(--text-secondary);">${sideEffect}</span>`;
-  }
-  // ⚠️ "خلاص اترجّع" بلون محايد وبعلامة ⏭ — مش أحمر. الرسالة بقت جملة واحدة
-  //    مفهومة بدل شرح تقني بطول ٢٠٠ حرف لكل المسارات اللي ما انطبقتش.
-  if (r.already) {
-    return `<span class="badge badge-neutral">⏭ خلاص اتعمل</span>`
-         + `<br><span class="reject-reason" style="color:var(--text-secondary);">${esc(r.rejectReason || '')}</span>`;
-  }
-  return `<span class="badge badge-danger">مرفوض</span><br><span class="reject-reason">${esc(r.rejectReason || '')}</span>`;
 }
 
 // v3.2.0 — ٣ حالات مش اتنين. الأصفر (warning) معناه: الميتافيلد اتكتب بس فيه
@@ -2801,95 +2589,39 @@ function describeActions(res) {
   return parts.join(' · ');
 }
 
-function onRowCheck(i, checked) { resultsData[i].selected = checked; syncSelectAll(); updateUpdateBtn(); }
-function toggleSelectAll(checked) {
-  // لازم found && valid — مش found بس — عشان مانحددش صف مش هيتحدث فعليًا.
-  // ⚠️ والصف اللي اتنفّذ في الجلسة دي مايترشّحش تاني: "تحديد الكل" بعد دفعة
-  //    ناجحة كان بيرجّع نفس الأوردرات للاختيار من غير ما حد ياخد باله.
-  resultsData.forEach((r, i) => { if (r.found && r.valid && !r.doneInSession) { r.selected = checked; const c = document.getElementById(`chk-${i}`); if (c) c.checked = checked; } });
-  document.getElementById('selectAll').checked     = checked;
-  document.getElementById('selectAllHead').checked = checked;
-  updateUpdateBtn();
-}
-function syncSelectAll() {
-  const eligible   = resultsData.filter(r => r.found && r.valid && !r.doneInSession);
-  const allChecked = eligible.length > 0 && eligible.every(r => r.selected);
-  document.getElementById('selectAll').checked     = allChecked;
-  document.getElementById('selectAllHead').checked = allChecked;
-}
-// ⚠️ دفعة كلها مرفوضة: الزرار بيفضل شغّال بس **باسم تاني** — بيسجّل الرفض
-//    ومابينفّذش على شوبيفاي. زرار اسمه "تحديث شوبيفاي" وهو مش هيحدّث أي حاجة
-//    بيخلي الموظف يفتكر إن حصل تنفيذ، فالاسم بيتغيّر مع الفعل.
+// ─── §TOOL-JS::updateBtn ───
 function updateUpdateBtn() {
-  const n   = resultsData.filter(r => r.found && r.valid && r.selected && !r.doneInSession).length;
-  const rej = pendingRejectedRows().length;
+  const n   = rqToUpdate().length;
   const btn = document.getElementById('updateBtn');
-  btn.disabled    = n === 0 && rej === 0;
-  btn.textContent =
-      n   > 0 ? `↩ تحديث شوبيفاي (${n.toLocaleString('en-US')})`
-    : rej > 0 ? `⛔ تسجيل المرفوض (${rej.toLocaleString('en-US')})`
-    :           '↩ تحديث شوبيفاي';
-}
-
-// ─── §TOOL-JS::pendingRejected — المرفوض اللي لسه ما اتسجلش بالسبب ده ───
-// ⚠️ الشرط مش "مرفوض" بس — كمان "ما اتسجلش بالسبب ده قبل كده". الموظف بيضغط
-// الزرار أكتر من مرة على نفس الجدول (بيضيف أرقام ويكمّل)، ومن غير الشرط ده كل
-// ضغطة كانت هتكتب نفس صف الرفض تاني في سجل دايم. والسبب لو اتغيّر بيتسجّل تاني
-// — دي واقعة جديدة مش تكرار.
-function pendingRejectedRows() {
-  return resultsData.filter(r =>
-    r.found && !r.valid && !r.doneInSession
-    && (r.rejectLoggedReason !== (r.rejectReason || '')));
+  btn.disabled    = isUpdating || n === 0;
+  btn.textContent = n > 0 ? `↩ تحديث شوبيفاي (${n.toLocaleString('en-US')})` : '↩ تحديث شوبيفاي';
 }
 
 // ─── §TOOL-JS::startUpdate ───
+// 🔴 مفيش إعادة استعلام قبل التنفيذ (مفيش بوسطة في الأداة). الحماية اللي بتفضل:
+//    ① الجدول متجاب من شوبيفاي ② نافذة التأكيد بتسمّي الأثر ③ الـ Worker بيعيد التحقق من
+//    شوبيفاي الحي لكل أوردر (`validateTransition`) ويوقف اللي حالته اتغيّرت ويسجّله
+//    `rejected` بـ `stage:'write'` لوحده ④ نزع سلاح الصف بعد التنفيذ (`rqDone`).
 async function startUpdate() {
   if (!currentEmployee) { showToast('يرجى تسجيل الدخول أولاً', 'error'); return; }
-  let toUpdate = resultsData.filter(r => r.found && r.valid && r.selected && !r.doneInSession);
-  // دفعة كلها مرفوضة لسه ليها شغل: تتسجّل — من غير أي تنفيذ على شوبيفاي.
-  if (!toUpdate.length && !pendingRejectedRows().length) return;
+  if (isUpdating) return;
+  const toUpdate = rqToUpdate();
+  if (!toUpdate.length) return;
 
   const btn = document.getElementById('updateBtn');
   const progressWrap = document.getElementById('updateProgress');
   const progressBar  = document.getElementById('progressBar');
   const progressText = document.getElementById('progressText');
 
+  // القفل من قبل نافذة التأكيد: سكانة أو ضغطة زرار وهي مفتوحة كانت هتخلّي اللي اتأكّد عليه غير اللي اتنفّذ
+  isUpdating = true;
   btn.disabled = true;
-  clearRecheckBanner();
+  let executed = false;
 
-  // ─── ① إعادة الاستعلام أولاً — قبل أي تنفيذ ───
-  btn.innerHTML = `<div class="spinner"></div> جاري إعادة الاستعلام...`;
-  let blocked = [];
   try {
-    if (toUpdate.length) blocked = await recheckBeforeUpdate(toUpdate);
-  } catch (err) {
-    // ما اتأكدناش من الحالة = ما بننفّذش. الشك هنا بيتعرض، مابيتخطّاش.
-    renderResults();
-    showToast(`تعذّر التأكد من الحالة قبل التنفيذ — ${err.message}. ما اتنفّذ ولا أوردر.`, 'error', 8000);
-    btn.disabled = false; updateUpdateBtn();
-    return;
-  }
-
-  const blockedTNs = new Set(blocked.map(b => b.trackingNumber));
-  for (const r of resultsData) if (blockedTNs.has(r.trackingNumber)) r.selected = false;
-  renderResults();
-
-  if (blocked.length) {
-    renderRecheckBanner(blocked);
-    playBeep('warn');
-    showToast(`${blocked.length.toLocaleString('en-US')} أوردر محتاج مراجعة — ما اتنفّذ ولا أوردر على شوبيفاي.`, 'error', 8000);
-    btn.disabled = false; updateUpdateBtn();
-    return;
-  }
-
-  toUpdate = resultsData.filter(r => r.found && r.valid && r.selected && !r.doneInSession);
-  const toReject = pendingRejectedRows();
-  if (!toUpdate.length && !toReject.length) { btn.disabled = false; updateUpdateBtn(); return; }
-
-  // ─── ② التأكيد — الأثر بالاسم، مش "متأكد؟" ───
-  const rtoCount = toUpdate.filter(r => r.machine === 'S1').length;
-  const s2Count  = toUpdate.length - rtoCount;
-  if (toUpdate.length) {
+    // ─── ① التأكيد — الأثر بالاسم، مش "متأكد؟" ───
+    const rtoCount = toUpdate.filter(r => r.machine === 'S1').length;
+    const s2Count  = toUpdate.length - rtoCount;
     const lines = [];
     if (rtoCount) lines.push({ text: `🚫 ${rtoCount} أوردر هيتلغي نهائيًا على شوبيفاي — الإلغاء مفيش رجوع فيه` });
     if (s2Count)  lines.push({ text: `📦 ${s2Count} أوردر هيترجّع مخزونه للمخزن`, soft: true });
@@ -2897,252 +2629,129 @@ async function startUpdate() {
       header: '⚠️ تأكيد التنفيذ على شوبيفاي',
       lead:   `هتنفّذ على ${toUpdate.length.toLocaleString('en-US')} أوردر:`,
       lines,
-      note:   toReject.length
-                ? `ومعاهم <b>${toReject.length.toLocaleString('en-US')}</b> أوردر مرفوض هيتسجّل في السجل بس — من غير أي تنفيذ.`
-                : 'راجع الجدول قبل التأكيد — الإلغاء بيتم على شوبيفاي فورًا.',
+      note:   'راجع الجدول قبل التأكيد — الإلغاء بيتم على شوبيفاي فورًا.',
       okLabel: `تأكيد — نفّذ على ${toUpdate.length} أوردر`,
     });
-    if (!ok) { btn.disabled = false; updateUpdateBtn(); showToast('اتلغى — ما اتنفّذ ولا أوردر', 'neutral'); return; }
-  }
+    if (!ok) { showToast('اتلغى — ما اتنفّذ ولا أوردر', 'neutral'); return; }
 
-  btn.innerHTML = `<div class="spinner"></div> جاري التحديث...`;
-  isUpdating = true;     // يتصفّر في finally تحت
-  if (toUpdate.length) {
+    btn.innerHTML = `<div class="spinner"></div> جاري التحديث...`;
     progressWrap.style.display = '';
     progressText.textContent   = `0 / ${toUpdate.length.toLocaleString('en-US')}`;
     progressBar.style.width    = '0%';
-  }
 
-  // ⚠️ v3.4 — تكرار الأوردر بيتشال **هنا كمان**، مش في الـ Worker بس.
-  //    الـ Worker عنده `seenOrders` لكل نداء، والدفعة بقت متقسّمة على مجموعات
-  //    — فرقمين تتبع لنفس الأوردر في مجموعتين مختلفتين كانوا هيعدّوا الحارس
-  //    (نداءين منفصلين). التانية مش بتلغي مرتين (`validateTransition` بترجّع
-  //    `already` لأن الحالة بقت Returned) — **بس الحماية دي بالصدفة مش
-  //    بالتصميم**، وفي أداة بتلغي أوردرات ده مش مقبول. التنضيف من هنا بيمنع
-  //    الحالة من أصلها.
-  // ⚠️ `itemRows` بتمشي **بالتوازي مع `items`** — المطابقة بالترتيب معتمدة
-  //    عليها، فأي تعديل على واحدة لازم يتعمل على التانية.
-  const seenRefs = new Set();
-  const items = [], itemRows = [];
-  for (const r of toUpdate) {
-    const key = String(r.businessRef || '').replace(/^#/, '');
-    if (key && seenRefs.has(key)) continue;   // نفس الأوردر برقم تتبع تاني
-    if (key) seenRefs.add(key);
-    items.push({
-      orderName:      r.businessRef,
-      trackingNumber: r.trackingNumber,
-      orderType:      r.orderType || '',
-    });
-    itemRows.push(r);
-  }
+    // ⚠️ تكرار الأوردر بيتشال **هنا كمان** (التعارض بيمنعه من الأساس، وده تأمين).
+    // ⚠️ `itemRows` بتمشي **بالتوازي مع `items`** — المطابقة بالترتيب معتمدة عليها.
+    const seenRefs = new Set();
+    const items = [], itemRows = [];
+    for (const r of toUpdate) {
+      const key = String(r.orderName || '').replace(/^#/, '');
+      if (key && seenRefs.has(key)) continue;
+      if (key) seenRefs.add(key);
+      // `orderType` فاضي: نوع شحنة بوسطة مش معروف من غير استعلام بوسطة (بيظهر `—` في السجل).
+      items.push({ orderName: r.orderName, trackingNumber: String(r.tracking), orderType: '' });
+      itemRows.push(r);
+    }
 
-  // المرفوض بيتبعت جنب المختار — من غير تنفيذ، عشان يتسجّل بـ type='rejected'.
-  // السبب بيتحسب في الـ Worker من حالة شوبيفاي وقت التسجيل؛ اللي بيتبعت هنا
-  // سياق بس (بوسطة) مش مصدر الحكم.
-  const rejectedPayload = toReject.map(r => ({
-    orderName:      r.businessRef,
-    trackingNumber: r.trackingNumber,
-    orderType:      r.orderType || '',
-    bostaState:     r.state || null,
-    reason:         r.rejectReason || '',
-  }));
-
-  try {
-    // ─── §TOOL-JS::chunkedUpdate — تقسيم الدفعة + تقدّم حقيقي ───
-    // ⚠️ v3.4 — قبل كده كان نداء **واحد** لكل الدفعة، والشريط بيتحرّك بعد ما
-    // الرد وصل — يعني بيقفز من 0% لـ 100% في جزء من الثانية. طول العملية
-    // الفعلية (٦٣ أوردر ≈ ١٣٠ نداء شوبيفاي متتابع ≈ ٤٠-٦٠ ثانية) الشاشة كانت
-    // بتقول `0 / 63` وبس. والسكوت ده هو الوقود المباشر للضغط التاني.
-    // المجموعة ١٠ (مش ١٥ زي أداة الشحن) لأن كل أوردر هنا بياخد نداءين على
-    // الأقل زائد حلقة تحقق الإلغاء.
+    // ─── §TOOL-JS::chunkedUpdate — تقسيم الدفعة على مجموعات ١٠ + تقدّم حقيقي ───
+    // المجموعة ١٠ (مش ١٥ زي أداة الشحن) لأن كل أوردر هنا بياخد نداءين على الأقل زائد حلقة تحقق الإلغاء.
     const CHUNK = 10;
-    const chunks = [];
-    for (let i = 0; i < items.length; i += CHUNK) chunks.push(items.slice(i, i + CHUNK));
-    if (!chunks.length) chunks.push([]);          // دفعة كلها مرفوضة — نداء تسجيل واحد
-
     const allResults = [], allRejected = [];
     let done = 0;
 
-    for (let ci = 0; ci < chunks.length; ci++) {
-      const data = await apiPost('update', {
-        employee: currentEmployee.username,
-        items:    chunks[ci],
-        // المرفوض مع أول مجموعة بس — تكراره مع كل مجموعة كان هيدّي صفوف مكررة
-        rejected: ci === 0 ? rejectedPayload : [],
-      });
+    for (let ci = 0; ci * CHUNK < items.length; ci++) {
+      const chunk = items.slice(ci * CHUNK, (ci + 1) * CHUNK);
+      const rowsOfChunk = itemRows.slice(ci * CHUNK, ci * CHUNK + chunk.length);
+      let data;
+      try {
+        data = await apiPost('update', { employee: currentEmployee.username, items: chunk, rejected: [] });
+      } catch (err) {
+        // ⚠️ الاتصال قطع في النص — التنفيذ بيحصل على السيرفر قبل ما يرد، فممكن يكون اتلغى فعلاً.
+        //    صفوف المجموعة دي بتتقفل بـ«فشل» وبتتعلّم عشان الموظف يراجع السجل قبل ما يعيد.
+        rowsOfChunk.forEach(row => {
+          row.sel = false;
+          row.res = { status: 'error', failReason: `انقطع الاتصال قبل الرد (${err.message}) — راجع تاب السجل قبل ما تعيد`, detail: '' };
+        });
+        throw err;
+      }
 
       allResults.push(...(data.results  || []));
       allRejected.push(...(data.rejected || []));
 
-      // ⚠️ المطابقة **بالترتيب** مش باسم الأوردر: الـ Worker بيرجّع نتيجة لكل
-      // عنصر بنفس الترتيب اللي اتبعت، ورقمين تتبع ممكن يرجعوا لنفس الأوردر
-      // (شحنة RTO + شحنة مرتجع) — فماب باسم الأوردر كان بيدّي الصفّين نتيجة
-      // واحدة (الأخيرة)، وهي غالبًا رسالة "اتخطّينا التكرار".
-      const rowsOfChunk = itemRows.slice(ci * CHUNK, ci * CHUNK + chunks[ci].length);
+      // ⚠️ المطابقة **بالترتيب** مش باسم الأوردر (الـ Worker بيرجّع نتيجة لكل عنصر بنفس الترتيب).
       rowsOfChunk.forEach((row, k) => {
         const res = (data.results || [])[k];
         if (!res) return;
-        const idx = resultsData.indexOf(row);
-
-        // ⚠️ الحالة جاية من السيرفر كما هي (Step 3C) — مش مشتقّة من success
-        row.shopifyStatus = res.status || (res.success ? 'success' : 'error');
-        row.failReason    = res.error || (res.warnings?.length ? res.warnings.join(' · ') : null);
-        row.updateDetail  = describeActions(res);
-        row.updateResult  = res;
-
-        // ⚠️ v3.4 — **نزع سلاح الصف بعد ما يتنفّذ.** أهم سطر في التعديل ده.
-        // الدليل المقيس: ٥٩ من ٦١ صف فشل في السجل كانوا على أوردرات نجحت
-        // قبلها — بعضها بفارق ٨ ثواني — لأن الشاشة بعد النجاح كانت شكلها
-        // زي قبل الضغط بالظبط.
-        row.selected = false;
-        // ⚠️ الإقفال بيتطبّق على النجاح والتحذير و"خلاص اتعمل" **بس**.
-        //    صف **فشل** بيفضل قابل لإعادة المحاولة عن قصد (خطأ شبكة عابر مثلاً)
-        //    — وإعادة الاستعلام الإجبارية + نافذة التأكيد قبل التنفيذ هما اللي
-        //    بيمنعوا إرساله على حالة قديمة.
-        row.doneInSession = (row.shopifyStatus !== 'error');
-        if (row.shopifyStatus === 'success' || row.shopifyStatus === 'warning') {
-          if (res.field === 'custom.manual_status')     row.s1 = res.valueAfter || row.s1;
-          else if (res.field === 'custom.status_2_r_e') row.s2 = res.valueAfter || row.s2;
-          row.valid   = false;
-          row.already = true;
-          row.rejectReason = 'الأوردر ده اترجّع في الدفعة دي — مفيش حاجة مطلوبة';
-        }
-
-        const chk = document.getElementById(`chk-${idx}`);
-        if (chk) { chk.checked = false; chk.disabled = true; }
-        const cell = document.getElementById(`shopify-cell-${idx}`);
-        if (cell) cell.innerHTML = getShopifyCell(row.shopifyStatus, row.failReason, row.updateDetail);
+        const status = res.status || (res.success ? 'success' : 'error');
+        row.sel = false;      // نزع السلاح — رجوع الصف للاختيار بعد النجاح بيرجّع باج الضغطة التانية بالكامل
+        row.res = {
+          status,
+          failReason: res.error || (res.warnings?.length ? res.warnings.join(' · ') : null),
+          detail:     describeActions(res),
+          raw:        res,
+        };
+        rqExec.push(row);
+        // نجاح / تحذير / «خلاص اتعمل» = اتقفل (بيتستبعد من أي جلب). الفشل بس بيفضل قابل للإعادة.
+        if (status !== 'error') rqDoneMark(row);
         done++;
       });
 
-      if (items.length) {
-        progressText.textContent = `${Math.min(done, items.length).toLocaleString('en-US')} / ${items.length.toLocaleString('en-US')}`;
-        progressBar.style.width  = `${Math.round(Math.min(done, items.length) / items.length * 100)}%`;
-      }
+      progressText.textContent = `${Math.min(done, items.length).toLocaleString('en-US')} / ${items.length.toLocaleString('en-US')}`;
+      progressBar.style.width  = `${Math.round(Math.min(done, items.length) / items.length * 100)}%`;
     }
 
-    // ─── الصفوف المكررة (رقم تتبع تاني لنفس الأوردر) ───
-    // ⚠️ الصف اللي اتشال في التنضيف فوق **ما رجعلوش نتيجة**، فكان هيفضل مختار
-    //    والزرار يفضل شغّال بنفس العدد — يعني نفس باج إعادة الإرسال بس من باب
-    //    تاني. بياخد نتيجة الصف اللي اتنفّذ فعلاً على نفس الأوردر.
-    const byRef = new Map();
-    for (const r of itemRows) {
-      const k = String(r.businessRef || '').replace(/^#/, '');
-      if (k && r.doneInSession) byRef.set(k, r);
-    }
-    resultsData.forEach((r, i) => {
-      if (r.doneInSession || !r.found) return;
-      const src = byRef.get(String(r.businessRef || '').replace(/^#/, ''));
-      if (!src) return;
-      r.shopifyStatus = src.shopifyStatus;
-      r.failReason    = src.failReason;
-      r.updateDetail  = src.updateDetail;
-      r.updateResult  = src.updateResult;
-      r.s1 = src.s1; r.s2 = src.s2;
-      r.valid = false; r.already = true;
-      r.rejectReason  = 'نفس الأوردر اتنفّذ برقم تتبع تاني في الدفعة دي';
-      r.selected = false; r.doneInSession = true;
-      const chk = document.getElementById(`chk-${i}`);
-      if (chk) { chk.checked = false; chk.disabled = true; }
+    // صف اتشال في التنضيف فوق (نفس الأوردر برقم تاني) ما رجعلوش نتيجة — بياخد «خلاص اتعمل»
+    toUpdate.forEach(r => {
+      if (itemRows.includes(r)) return;
+      r.sel = false;
+      r.res = { status: 'already', failReason: 'نفس الأوردر اتنفّذ برقم تتبع تاني في الدفعة دي', detail: '' };
+      rqDoneMark(r);
     });
 
-    // ─── صفوف المرفوض بعد التسجيل ───
-    const rejectedRows = [];
-    for (const rr of allRejected) {
-      const key = String(rr.orderName || '').replace(/^#/, '');
-      const row = resultsData.find(r => String(r.businessRef || '').replace(/^#/, '') === key);
+    executed = true;
 
-      if (rr.becameValid) {
-        if (row) {
-          row.s1 = rr.s1; row.s2 = rr.s2; row.returnStatus = rr.returnStatus ?? row.returnStatus;
-          row.valid = true; row.already = false; row.machine = rr.machine; row.rejectReason = null;
-          row.selected = false;               // ما اتنفّذش — الموظف هو اللي يختار
-          row.rejectLoggedReason = undefined;
-        }
-        continue;
-      }
-
-      if (row) {
-        row.s1 = rr.s1 ?? row.s1; row.s2 = rr.s2 ?? row.s2;
-        row.returnStatus = rr.returnStatus ?? row.returnStatus;
-        row.already      = !!rr.already;
-        row.rejectReason = rr.reason || row.rejectReason;
-        // ⚠️ العلامة بتتحط **بس** لو التسجيل تم فعلاً — صف ما اتسجلش لازم يفضل
-        //    مرشّح للتسجيل في الضغطة الجاية، مش يتعلّم إنه خلص.
-        if (rr.logged) row.rejectLoggedReason = row.rejectReason || '';
-        row.rejectLogged   = rr.logged === true;
-        row.rejectLogError = rr.logError || null;
-      }
-
-      rejectedRows.push({
-        orderName:      rr.orderName || (row ? row.businessRef : ''),
-        reason:         rr.reason || (row ? row.rejectReason : ''),
-        machine:        rr.machine,
-        already:        !!rr.already,
-        stage:          rr.stage || 'lookup',
-        trackingNumber: rr.trackingNumber || (row ? row.trackingNumber : ''),
-        orderType:      rr.orderType || (row ? row.orderType : ''),
-        bostaState:     row ? row.state : null,
-        logged:         rr.logged,
-        logError:       rr.logError || null,
-      });
-    }
-
-    renderResults();
-
-    // ⚠️ الصف اللي اتوقف قبل التنفيذ بيرجع في **الاتنين**: في `results` (بحالته)
-    //    وفي `rejected` (لأنه اتسجّل هناك). جمع المصدرين على بعض كان بيعدّ نفس
-    //    الأوردر مرتين — أوردر واحد يطلّع "خلاص متعمل: 2". الصفوف اللي مصدرها
-    //    التوقف وقت التنفيذ (`stage === 'write'`) بتتشال من عدّادات المرفوض،
-    //    لأنها **متعدّة أصلاً** في `results`.
-    const rejectedFromLookup = rejectedRows.filter(r => r.stage !== 'write');
+    // الأوردر اللي اتوقف وقت التنفيذ بيرجع في `results` وفي `rejected` (stage:'write') — الـ Worker سجّله بنفسه.
+    const writeStage  = allRejected.filter(r => r.stage === 'write');
+    const alreadyRows = writeStage.filter(r => r.already).map(rr => ({
+      orderName: rr.orderName, reason: rr.reason, machine: rr.machine, already: true, stage: 'write',
+      trackingNumber: rr.trackingNumber, orderType: rr.orderType, logged: rr.logged, logError: rr.logError || null,
+    }));
 
     const s  = allResults.filter(r => r.status === 'success').length;
     const w  = allResults.filter(r => r.status === 'warning').length;
     const f  = allResults.filter(r => r.status === 'error').length;
-    const al = allResults.filter(r => r.status === 'already').length
-             + rejectedFromLookup.filter(r => r.already).length;
-    const rejectedRealRows = rejectedFromLookup.filter(r => !r.already);
-    // ⚠️ `notLogged` = "عملية تمّت على شوبيفاي ومفيش ليها سجل". الصف اللي ما
-    //    اتنفّذش (`already` أو توقف) بياخد حالة تسجيله من مسار المرفوض، فلو
-    //    اتعدّ هنا كان الملخّص هيقول "عملية تمّت" على أوردر ما حصلّوش حاجة.
-    const notLogged        = allResults.filter(r => r.executed && r.logged === false).length;
-    const rejectedNotLogged = rejectedRows.filter(r => r.logged === false).length;
-    const becameValid      = allRejected.filter(r => r.becameValid).length;
+    const al = allResults.filter(r => r.status === 'already').length;
+    // ⚠️ `notLogged` = عملية **تمّت** على شوبيفاي ومفيش ليها سجل (الصف اللي ما اتنفّذش بياخد حالة تسجيله من مسار المرفوض)
+    const notLogged = allResults.filter(r => r.executed && r.logged === false).length;
 
     showToast(
       `تم: ${s.toLocaleString('en-US')} ✓`
         + (w  ? ` | تحذير: ${w} ⚠` : '')
         + (f  ? ` | فشل: ${f} ✗` : '')
         + (al ? ` | خلاص متعمل: ${al} ⏭` : '')
-        + (rejectedRealRows.length ? ` | مرفوض: ${rejectedRealRows.length} ⛔` : '')
-        + (notLogged + rejectedNotLogged ? ` | ما اتسجلش: ${notLogged + rejectedNotLogged}` : ''),
-      // ⚠️ "خلاص اتعمل" مش سبب لتوست أحمر — دي أكتر حالة متكررة، ولو لوّنّاها
-      //    فشل الموظف بيتعلّم يتجاهل الأحمر.
-      (f || w || rejectedRealRows.length) ? 'error' : 'success',
-      (f || w || rejectedRealRows.length || al) ? 7000 : 3000
+        + (notLogged ? ` | ما اتسجلش: ${notLogged}` : ''),
+      // "خلاص اتعمل" مش سبب لتوست أحمر — لو لوّنّاها فشل الموظف بيتعلّم يتجاهل الأحمر
+      (f || w) ? 'error' : 'success',
+      (f || w || al) ? 7000 : 3000
     );
-    if (w || rejectedRealRows.length) playBeep('warn');
+    if (w) playBeep('warn');
 
     showUpdateResultModal({
-      // الإجمالي = اللي اتبعت للتنفيذ + المرفوض **من الاستعلام** بس (المرفوض
-      // من التوقف وقت التنفيذ متعدّ أصلاً جوّه `items`)
-      total: items.length + rejectedFromLookup.length,
-      succeeded: s, warned: w, failed: f, already: al, notLogged,
-      rejectedRows: rejectedRealRows,
-      alreadyRows:  rejectedFromLookup.filter(r => r.already),
-      becameValid, rejectedNotLogged,
+      total: items.length, succeeded: s, warned: w, failed: f, already: al, notLogged,
+      rejectedRows: [], alreadyRows, becameValid: 0, rejectedNotLogged: 0,
     });
   } catch (err) {
-    // ⚠️ التنفيذ بيحصل على السيرفر قبل ما يرد — لو الاتصال قطع في النص، ممكن
-    //    يكون فيه أوردرات اتلغت فعلاً. تاب السجل هو المرجع.
+    // ⚠️ التنفيذ بيحصل على السيرفر قبل ما يرد — لو الاتصال قطع في النص، ممكن يكون فيه أوردرات اتلغت فعلاً.
     showToast(`خطأ: ${err.message} — راجع تاب السجل قبل ما تعيد المحاولة`, 'error', 9000);
+    executed = true;
   } finally {
     isUpdating = false;
     btn.disabled = false;
-    updateUpdateBtn();
+    rqRender();
     setTimeout(() => { progressWrap.style.display = 'none'; }, 2500);
   }
+
+  // تحديث الطابور تلقائي بعد التنفيذ — اللي اتنفّذ بيتشال (rqDone بيحمي من تأخّر الفهرس)
+  if (executed) await rqLoad(true);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3238,56 +2847,49 @@ function closeResultModal() {
   document.getElementById('resultOverlay').classList.remove('open');
 }
 
-// "تسجيل أوردرات جديدة" — دفعة نضيفة: قايمة المسح والنتايج بيترجعوا صفر
+// "تسجيل أوردرات جديدة" — دفعة نضيفة: التعليم بيتصفّر والطابور بيتحدّث
 function startNewBatch() {
   closeResultModal();
   clearScans();
-  document.getElementById('step1Body').style.display = 'flex';
-  document.getElementById('toggleStep1Btn').style.display = 'none';
   window.scrollTo({ top: 0, behavior: 'smooth' });
   scanInputEl.focus();
 }
 
 // ─── §TOOL-JS::exportResultsXLSX ───
+// بيصدّر اللي اتنفّذ في الجلسة (اتشال من الجدول) + اللي لسه في الجدول بحالته.
 async function exportResultsXLSX() {
-  if (!resultsData.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
+  const rows = [...rqExec.filter(r => !rqState.orders.includes(r)), ...rqState.orders];
+  if (!rows.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
   const wb  = new ExcelJS.Workbook();
   const ws  = wb.addWorksheet('النتائج');
   ws.columns = [
-    { header: 'رقم الأوردر',      key: 'order',  width: 18 },
-    { header: 'رقم التتبع',       key: 'tn',     width: 18 },
-    { header: 'نوع بوسطة',        key: 'type',   width: 16 },
-    { header: 'حالة بوسطة',       key: 'state',  width: 22 },
-    { header: 'S1',                key: 's1',    width: 18 },
-    { header: '[S-2]',             key: 's2',    width: 20 },
-    { header: 'returnStatus',      key: 'rs',    width: 20 },
-    { header: 'التحديث المطلوب',  key: 'target', width: 20 },
-    { header: 'سبب الرفض',        key: 'reject', width: 34 },
-    { header: 'تحديث شوبيفاي',    key: 'shopify',width: 16 },
-    { header: 'ما تم فعليًا',      key: 'did',    width: 34 },
-    { header: 'قطع رجعت للمخزن',  key: 'units',  width: 16 },
+    { header: 'رقم الأوردر',        key: 'order',   width: 18 },
+    { header: 'العميل',             key: 'cust',    width: 22 },
+    { header: 'رقم التتبع',         key: 'tn',      width: 18 },
+    { header: 'نوع الراجع',         key: 'machine', width: 24 },
+    { header: 'حالة بوسطة',         key: 'state',   width: 22 },
+    { header: 'تاريخ الأوردر',      key: 'created', width: 16 },
+    { header: 'النتيجة',            key: 'result',  width: 22 },
+    { header: 'السبب / الملاحظة',   key: 'reason',  width: 40 },
+    { header: 'ما تم فعليًا',        key: 'did',     width: 34 },
+    { header: 'قطع رجعت للمخزن',    key: 'units',   width: 16 },
   ];
-  resultsData.forEach(r => {
-    const res = r.updateResult || null;
-    const units = res
-      ? (res.restock?.verifiedUnits ?? res.restock?.confirmed ?? res.cancel?.restockedUnits ?? '')
-      : '';
+  rows.forEach(r => {
+    const res = r.res || null;
+    const raw = res && res.raw;
+    const units = raw ? (raw.restock?.verifiedUnits ?? raw.restock?.confirmed ?? raw.cancel?.restockedUnits ?? '') : '';
     ws.addRow({
-      order:   r.found ? (r.businessRef.startsWith('#') ? r.businessRef : '#' + r.businessRef) : '—',
-      tn:      r.trackingNumber,
-      type:    r.orderType   || '—',
-      state:   r.state       || (r.bostaFailed ? 'تعذّر الاستعلام' : 'غير موجود'),
-      s1:      r.s1           || '—',
-      s2:      r.s2           || '—',
-      rs:      r.returnStatus || '—',
-      target:  r.valid ? (r.machine === 'S1' ? 'S1 → Returned' : '[S-2] → Returned')
-             : (r.already ? 'خلاص متعمل' : '—'),
-      reject:  r.rejectReason || r.failReason || '—',
-      shopify: r.shopifyStatus === 'success' ? 'تم'
-             : r.shopifyStatus === 'warning' ? 'تم جزئيًا (راجع الملاحظة)'
-             : r.shopifyStatus === 'error'   ? 'فشل'
-             : r.shopifyStatus === 'already' ? 'خلاص متعمل' : '—',
-      did:     r.updateDetail || '—',
+      order:   r.orderName ? (String(r.orderName).startsWith('#') ? r.orderName : '#' + r.orderName) : '—',
+      cust:    r.customer || '—',
+      tn:      r.tracking || '—',
+      machine: r.machine === 'S2' ? '[S-2] مرتجع بعد التسليم' : 'S1 راجع قبل التسليم (RTO)',
+      state:   r.bostaStatus || '—',
+      created: r.createdAt ? formatDate(r.createdAt) : '—',
+      result:  r.conflict ? 'تعارض — مرفوضة'
+             : res ? ({ success: 'تم', warning: 'تم جزئيًا (راجع الملاحظة)', error: 'فشل', already: 'خلاص متعمل' }[res.status] || '—')
+             : r.sel ? 'جاهزة للتحديث' : 'في انتظار التسجيل',
+      reason:  r.conflict || (res && res.failReason) || '—',
+      did:     (res && res.detail) || '—',
       units:   units === '' ? '—' : units,
     });
   });
@@ -3962,16 +3564,18 @@ async function exportLogXLSX() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// §RQ-JS — طابور «راجع من بوسطة» (v3.5 · طلب أحمد 25-10-2026)
+// §RQ-JS — طابور «راجع من بوسطة» = جدول الأداة نفسه (v3.6 · طلب أحمد 27-10-2026)
 // ══════════════════════════════════════════════════════════════
-// 🔴 الشروط التلاتة عايشة في الـ Worker (`get_ready_to_return`) — مش هنا.
-//    الصفحة بتعرض اللي راجع بالحرف ومابتفلترش ولا صف (درس R1). ⛔ ممنوع أي
-//    فلترة محلية على `bostaStatus` أو `machine`.
-// ⛔ عرض بحت — مش حارس. السكان والـ lookup/update زي ما هم بالحرف.
-// ⛔ مفيش polling ولا تحديث تلقائي: الجلب عند الدخول وعند «↻ تحديث» بس.
-const RQ_LATE_DAYS = 3;     // أقدم من كده بيتلوّن كهرماني — الطرد اللي بوسطة ردّته من فترة أولى بالسؤال
+// 🔴 الشروط التلاتة عايشة في الـ Worker (`get_ready_to_return`) — مش هنا. الصفحة بتعرض
+//    اللي راجع بالحرف ومابتفلترش ولا صف (درس R1). مفيش فلترة محلية على `bostaStatus` أو `machine`.
+// 🔴 والجدول بقى **حارس السكان**: رقم مش فيه بيترفض. (الحارس الحقيقي للكتابة لسه
+//    `validateTransition` في الـ Worker وقت التنفيذ.)
+// ⛔ مفيش تحديث تلقائي بالتايمر: الجلب عند الدخول وعند «↻ تحديث» وبعد كل تنفيذ وعند سكانة رقم مش في الجدول (لو الجدول أقدم من دقيقة).
 const rqState = { orders: [], at: null, loading: false, failed: false };
+const rqExec = [];   // الصفوف اللي اتنفّذت في الجلسة دي (للتصدير — بتتشال من الجدول)
+let rqLoadP = null;
 
+const RQ_LATE_DAYS = 3;     // أقدم من كده بيتلوّن كهرماني — الطرد اللي بوسطة ردّته من فترة أولى بالسؤال
 function rqDayDiff(iso) {
   const today = cairoDateStr(toCairo(new Date()));
   const that  = cairoDateStr(toCairo(iso));
@@ -3987,15 +3591,46 @@ function rqAgeText(iso) {
 }
 
 // ⚠️ العدّاد قبل أول جلب ناجح = `—` مش `0` — «ما اتحدّثش» ≠ «مفيش شغل».
+function rqResultCell(o) {
+  if (o.conflict) return `<span class="badge badge-danger">⛔ تعارض — مرفوضة</span><br><span class="reject-reason">${esc(o.conflict)}</span>`;
+  if (o.sel)      return `<span class="badge badge-success">✅ جاهزة للتحديث</span>`;
+  if (o.res)      return getShopifyCell(o.res.status, o.res.failReason, o.res.detail);
+  return `<span class="badge badge-neutral">⏳ في انتظار التسجيل</span>`;
+}
+
+function rqActionCell(o, i) {
+  if (o.res && o.res.status === 'warning')
+    return `<button class="btn btn-outline btn-sm" onclick="rqDismiss(${i})">✓ تمت المراجعة</button>`;
+  if (!o.tracking)
+    return `<button class="btn btn-outline btn-sm" disabled>➕ إضافة للمسح</button><br><span class="reject-reason" style="color:var(--text-secondary);">مفيش رقم تتبع</span>`;
+  if (o.conflict || isUpdating)
+    return `<button class="btn btn-outline btn-sm" disabled>➕ إضافة للمسح</button>`;
+  return o.sel
+    ? `<button class="btn btn-outline btn-sm" onclick="rqToggle(${i})">↩ إلغاء التعليم</button>`
+    : `<button class="btn btn-outline btn-sm" onclick="rqToggle(${i})">➕ إضافة للمسح</button>`;
+}
+
 function rqRender() {
-  const rows = rqState.orders;
+  const rows  = rqState.orders;
   const tbody = document.getElementById('rqBody');
-  document.getElementById('rqCount').textContent = rqState.at ? rows.length.toLocaleString('en-US') : '—';
+  const wrap  = document.getElementById('rqTableWrap');
+  const empty = document.getElementById('rqEmpty');
+  document.getElementById('rqCount').textContent      = rqState.at ? String(rows.length) : '—';
+  document.getElementById('rqReadyCount').textContent = String(rows.filter(r => r.sel && !r.conflict).length);
   document.getElementById('rqStamp').textContent = rqState.at ? `آخر تحديث: ${formatDateTime(rqState.at.toISOString())}` : '';
 
-  const empty = document.getElementById('rqEmpty'), wrap = document.getElementById('rqTableWrap');
+  // بانر التعارض — قبل أي سكان
+  const cf = rows.filter(r => r.conflict);
+  const cfBox = document.getElementById('rqConflict');
+  if (cf.length) {
+    cfBox.innerHTML = `⛔ <b>تعارض في الطابور — ${cf.length.toLocaleString('en-US')} صف مش هيتنفّذ ولا هيتقبل سكانه:</b><ul>`
+      + cf.map(r => `<li><b>${esc(r.orderName)}</b> (${r.machine === 'S2' ? '[S-2]' : 'S1'}) — ${esc(r.conflict)}</li>`).join('') + '</ul>';
+    cfBox.style.display = '';
+  } else { cfBox.style.display = 'none'; cfBox.innerHTML = ''; }
+
+  updateUpdateBtn();
   if (!rows.length) {
-    wrap.style.display = 'none';
+    wrap.style.display  = 'none';
     empty.style.display = '';
     empty.innerHTML = rqState.at
       ? '<div class="icon">✅</div><div>مفيش أوردرات بوسطة راجعاها دلوقتي</div>'
@@ -4004,17 +3639,14 @@ function rqRender() {
     return;
   }
   empty.style.display = 'none';
-  wrap.style.display = '';
+  wrap.style.display  = '';
   tbody.innerHTML = rows.map((o, i) => {
     const age = rqAgeText(o.createdAt);
     const machine = o.machine === 'S2'
       ? '<span class="badge badge-neutral">[S-2] مرتجع بعد التسليم</span>'
       : '<span class="badge badge-blue">S1 راجع قبل التسليم (RTO)</span>';
-    const inList = o.tracking && scannedNums.includes(String(o.tracking));
-    const action = !o.tracking ? '<span class="tracking-num">—</span>'
-      : inList ? '<span class="badge badge-success">✓ في القايمة</span>'
-      : `<button class="btn btn-outline btn-sm" onclick="rqAddRow(${i})">➕ إضافة للمسح</button>`;
-    return `<tr>
+    const cls = o.conflict ? 'row-rejected' : (o.sel ? 'rq-ready' : '');
+    return `<tr id="rqRow-${i}" class="${cls}">
       <td>${orderLink(esc(o.orderName), o.orderId)}</td>
       <td class="rq-cust">${esc(o.customer || '—')}</td>
       <td><span class="tracking-num">${esc(o.tracking || '—')}</span>${o.trackingLegacy ? ' <span class="badge badge-neutral" title="الرقم جاي من الحقل القديم bosta_tracking_number">قديم</span>' : ''}</td>
@@ -4022,51 +3654,49 @@ function rqRender() {
       <td><span class="badge badge-warn">${esc(o.bostaStatus)}</span></td>
       <td>${o.bostaStatusAt ? esc(formatDateTime(o.bostaStatusAt)) : '—'}</td>
       <td>${esc(formatDate(o.createdAt))}<span class="rq-age${age.late ? ' late' : ''}">${esc(age.text)}</span></td>
-      <td>${action}</td>
+      <td>${rqResultCell(o)}</td>
+      <td>${rqActionCell(o, i)}</td>
     </tr>`;
   }).join('');
 }
 
-// الإضافة بتعدّي على نفس مسار السكان (addTrackingNumber) — مفيش مسار إضافة تاني.
-function rqAddRow(i) {
-  const o = rqState.orders[i];
-  if (!o || !o.tracking) return;
-  addTrackingNumber(String(o.tracking));
-  rqRender();
+// ⚠️ `loading` بيمنع نداءين متوازيين — والنداء التاني بياخد نفس الـ Promise (السكانة بتستناه).
+function rqLoad(silent) {
+  if (rqState.loading) return rqLoadP;
+  rqLoadP = rqLoadRun(silent);
+  return rqLoadP;
 }
-
-// ⚠️ `loading` بيمنع نداءين متوازيين (ضغطتين ورا بعض).
-async function rqLoad(silent) {
-  if (rqState.loading) return;
+async function rqLoadRun(silent) {
   rqState.loading = true;
   const btn = document.getElementById('rqRefreshBtn');
   btn.disabled = true; btn.textContent = '⏳ جاري التحديث ...';
   try {
     const data = await apiGet('get_ready_to_return');
-    rqState.orders = Array.isArray(data.orders) ? data.orders : [];
-    rqState.at = new Date();
+    const orders = Array.isArray(data.orders) ? data.orders : [];
+    rqState.orders = rqIngest(orders, rqState.orders);
+    rqState.at     = new Date();
     rqState.failed = false;
     document.getElementById('rqFail').style.display = 'none';
-    // الاقتطاع بانر منفصل عن الفشل — «الطابور أطول من المعروض» ≠ «ما اتجابش»
     const tr = document.getElementById('rqTrunc');
     tr.style.display = data.truncated ? '' : 'none';
-    if (data.truncated) tr.textContent = '⚠️ الاستعلام وصل لحد الصفحات المسموح — فيه أوردرات راجعة ممكن مش ظاهرة. اسكن عادي، والـ Worker هو اللي بيحكم.';
+    if (data.truncated) tr.textContent = '⚠️ الاستعلام وصل لحد الصفحات المسموح — فيه أوردرات راجعة ممكن مش ظاهرة في الجدول، وشحنتها هتترفض لو اتسكنت.';
   } catch (err) {
-    // الفشل بيتقال، والقايمة القديمة بتفضل لو كان فيه جلب ناجح قبله. والسكان شغّال عادي.
+    // الفشل بيتقال، والقايمة القديمة بتفضل لو كان فيه جلب ناجح قبله.
     rqState.failed = true;
     const f = document.getElementById('rqFail');
     f.style.display = '';
-    f.textContent = `⚠️ تعذّر تحميل طابور «راجع من بوسطة» — ${err.message}. السكان شغّال عادي.`;
+    f.textContent = `⚠️ تعذّر تحميل طابور «راجع من بوسطة» — ${err.message}.`;
   } finally {
     rqState.loading = false;
     btn.disabled = false; btn.textContent = '↻ تحديث';
     rqRender();
-    if (!silent) scanInputEl.focus();
+    if (!silent) scanInputEl?.focus();
   }
 }
 
 function rqReset() {
   rqState.orders = []; rqState.at = null; rqState.failed = false;
+  rqExec.length = 0;
   document.getElementById('rqFail').style.display = 'none';
   document.getElementById('rqTrunc').style.display = 'none';
   rqRender();
