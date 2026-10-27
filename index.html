@@ -2438,7 +2438,6 @@ function rqMark(i, opts = {}) {
   if (opts.reveal) {
     const tr = document.getElementById(`rqRow-${i}`);
     if (tr) {
-      tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       tr.classList.add('rq-hl');
       setTimeout(() => tr.classList.remove('rq-hl'), 1600);
     }
