@@ -523,6 +523,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .rq-fail li { margin-bottom: 3px; }
 /* ٧ أعمدة: حشو أضيق وبادج العمر تحت التاريخ — عشان عمود «إجراء» مايتقصّش برّه الشاشة */
 #rqTableWrap thead th, #rqTableWrap tbody td { padding-inline: 8px; }
+/* جدول «راجع من بوسطة» RTL: رقم الأوردر أقصى اليمين وإجراء أقصى اليسار (باقي الجداول لسه ltr) */
+#rqTableWrap, #rqTableWrap table { direction: rtl; }
 #rqBody .rq-time { display: block; margin: 3px 0 0; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); }
 #rqBody .rq-trk { font-weight: 800; color: var(--text-primary); }
 
