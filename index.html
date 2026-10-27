@@ -518,7 +518,6 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .rq-ready-badge { background: var(--green); }
 #rqBody tr.rq-ready { background: #bbf7d0; }
 #rqBody tr.rq-ready .badge-success { background: #fff; }
-#rqBody tr.rq-hl { background: var(--amber-light); outline: 2px solid var(--amber); outline-offset: -2px; }
 .rq-fail ul { margin: 6px 0 0; padding-inline-start: 20px; }
 .rq-fail li { margin-bottom: 3px; }
 /* ٧ أعمدة: حشو أضيق وبادج العمر تحت التاريخ — عشان عمود «إجراء» مايتقصّش برّه الشاشة */
@@ -2435,13 +2434,6 @@ function rqMark(i, opts = {}) {
   const o = rqState.orders[i];
   o.sel = true; o.res = null;
   rqRender();
-  if (opts.reveal) {
-    const tr = document.getElementById(`rqRow-${i}`);
-    if (tr) {
-      tr.classList.add('rq-hl');
-      setTimeout(() => tr.classList.remove('rq-hl'), 1600);
-    }
-  }
 }
 
 async function addTrackingNumber(num) {
