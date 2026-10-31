@@ -972,7 +972,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
                 <th id="thEmp" class="sortable-th" data-sort-key="emp"     onclick="toggleSort('emp')">الموظف<span class="sort-icon" data-sort-key="emp"></span></th>
                 <th id="thOrder" class="sortable-th" data-sort-key="order"   onclick="toggleSort('order')">الأوردر<span class="sort-icon" data-sort-key="order"></span></th>
                 <th id="thMachine" class="sortable-th" data-sort-key="machine" onclick="toggleSort('machine')">الماكينة<span class="sort-icon" data-sort-key="machine"></span></th>
-                <th>التحديث</th>
+                <th id="thTrans">التحديث</th>
                 <th id="thResult" class="sortable-th" data-sort-key="result"  onclick="toggleSort('result')">النتيجة<span class="sort-icon" data-sort-key="result"></span></th>
                 <th class="sortable-th" data-sort-key="tn"      onclick="toggleSort('tn')">التتبع<span class="sort-icon" data-sort-key="tn"></span></th>
               </tr>
@@ -1412,7 +1412,7 @@ const TOOL_VERSION = '3.6';
 // ⚠️ مالهاش أي علاقة بـ TOOL_VERSION — دي بتوصف الصفحة، ودي بتوصف أقل Worker
 // مقبول. متزامنهمش. وأي endpoint/حقل جديد الصفحة تعتمد عليه ⇒ ارفعها في نفس
 // التسليم، وإلا الحارس بيرجع لوضع "مفيش حماية".
-const MIN_WORKER_VERSION = '3.6.0';   // v3.6.0 = أول Worker فيه get_ready_to_return (طابور «راجع من بوسطة»). v3.4.0 كان `already` و rejected[] و sortBy
+const MIN_WORKER_VERSION = '3.7.1'; // v3.7.1 = فلتر transition في get_logs* (الأقدم بيتجاهله في صمت) · قبله 3.6.0 =   // v3.6.0 = أول Worker فيه get_ready_to_return (طابور «راجع من بوسطة»). v3.4.0 كان `already` و rejected[] و sortBy
 let   workerVersion = null;
 
 // ── روابط الـ Workers — constants مش حقول إعدادات (Standards #28) ──
@@ -3119,6 +3119,7 @@ const srvLog = ecoSrvFilters({
     { key: 'date',    th: '#thDate',    type: 'date', label: 'التاريخ' },
     { key: 'emp',     th: '#thEmp',     type: 'list', label: 'الموظف', param: 'employees', items: [] },
     { key: 'search',  th: '#thOrder',   type: 'text', label: 'بحث برقم أوردر أو ملاحظة', param: 'search' },
+    { key: 'trans',   th: '#thTrans',   type: 'text', label: 'بحث في التحديث (مثال: In-Return)', param: 'transition' },
     { key: 'machine', th: '#thMachine', type: 'list', label: 'الماكينة', param: 'machines', items: [
         { value: 'S1', label: 'S1 — مسار RTO' },
         { value: 'S2', label: '[S-2] — مرتجع بعد التسليم' } ] },
