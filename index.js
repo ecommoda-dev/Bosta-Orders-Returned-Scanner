@@ -5,6 +5,7 @@
 //                       (extra.sourceTool = "bosta_orders_returned_scanner" — see §CONSTANTS)
 //
 // ═══════════════════════════════════════════════════════════════════════════
+// v3.7.1 — فلتر `transition` (عمود «التحديث» في تاب السجل) — بحث نصي في value_before/value_after
 // v3.7.0 — §READY-RETURN: الشرط ③ بقى كود ∈ {41, 46} (طلب أحمد 31-10-2026)
 // ═══════════════════════════════════════════════════════════════════════════
 // الثغرة: الطرد اللي المندوب سلّمه للمخزن بوسطة بتحوّل كوده من `41 · Out For Return`
@@ -179,7 +180,7 @@
 // ══════════════════════════════════════════════════════════════
 // §CONSTANTS
 // ══════════════════════════════════════════════════════════════
-const WORKER_VERSION   = '3.7.0';
+const WORKER_VERSION   = '3.7.1';
 const API_VERSION      = '2026-01';                          // صريح دايمًا — أبدًا "latest"
 const TOOL_NAME        = 'bosta_return';                     // login/logout D1 logging only — unchanged
 const SOURCE_TOOL      = 'bosta_orders_returned_scanner';    // used in extra.sourceTool for status-write logs
@@ -524,7 +525,7 @@ function buildLogFilterSQL(select, {
   employee = null, employees = null,
   type     = null, types     = null,
   results  = null, machines  = null,
-  search   = null,
+  search   = null, transition = null,
   dateFrom = null, dateTo    = null,
 } = {}) {
   let sql = `${select} FROM logs WHERE type NOT IN ('login','logout') AND ${LOG_SCOPE_SQL}`;
@@ -546,6 +547,8 @@ function buildLogFilterSQL(select, {
   }
 
   if (search)   { sql += ' AND (order_name LIKE ? OR notes LIKE ?)'; b.push(`%${search}%`, `%${search}%`); }
+  // v3.7.1 — فلتر عمود «التحديث» (value_before → value_after) — نص جزئي على أي من الطرفين
+  if (transition) { sql += ' AND (value_before LIKE ? OR value_after LIKE ?)'; b.push(`%${transition}%`, `%${transition}%`); }
   if (dateFrom) { sql += ' AND substr(timestamp, 1, 10) >= ?'; b.push(dateFrom); }
   if (dateTo)   { sql += ' AND substr(timestamp, 1, 10) <= ?'; b.push(dateTo); }
 
@@ -622,6 +625,7 @@ function logParamsFrom(url) {
     results:   results.length  ? results  : null,
     machines:  machines.length ? machines : null,
     search:    url.searchParams.get('search')   || null,
+    transition: url.searchParams.get('transition') || null,
     dateFrom:  url.searchParams.get('dateFrom') || null,
     dateTo:    url.searchParams.get('dateTo')   || null,
   };
