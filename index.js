@@ -5,6 +5,15 @@
 //                       (extra.sourceTool = "bosta_orders_returned_scanner" — see §CONSTANTS)
 //
 // ═══════════════════════════════════════════════════════════════════════════
+// v3.7.0 — §READY-RETURN: الشرط ③ بقى كود ∈ {41, 46} (طلب أحمد 31-10-2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// الثغرة: الطرد اللي المندوب سلّمه للمخزن بوسطة بتحوّل كوده من `41 · Out For Return`
+// لـ`46 · Returned to business` — فكان بيختفي من الجدول قبل ما الموظف يسكنه، والواجهة
+// (الجدول هو حارس السكان) كانت بترفضه مع إن `validateTransition` كان هيقبله (مابيبصّش
+// على كود بوسطة أصلاً). دلوقتي الطابور بيعرض الكودين، والرد بيرجّع `bostaCode` رقمي
+// والواجهة بتعرضه في عمود «حالة بوسطة». الطرد بيخرج من الطابور لوحده بعد السكان
+// (S1/S2 بقى `Returned`). ⛔ `validateTransition` ما اتلمسش — الحارس الحقيقي زي ما هو.
+//
 // v3.6.1 — `costLog` في `handleReadyReturn`: `queryCost` { calls, actualTotal, requestedTotal, maxActual }
 //          في رد `get_ready_to_return` (قياس `actualQueryCost` بدل التخمين). مراقبة بس — صفر تعديل منطق.
 // v3.6.0 — §READY-RETURN: طابور «راجع من بوسطة» (طلب أحمد 25-10-2026)
@@ -14,7 +23,7 @@
 //   ① المندوب (`custom.courier`) = Bosta
 //   ② الحالة `In-Return` على الماكينة (S1 = `manual_status` · S2 = `status_2_r_e`)
 //   ③ ميتافيلد الـ webhook بتاع نفس الماكينة (`bosta_webhook_status_update_s1/s2`)
-//      كوده = 41 (Out For Return) — القيمة المخزّنة «41 · Out For Return».
+//      كوده 41 (Out For Return) أو 46 (Returned to business) — القيمة المخزّنة «41 · Out For Return».
 // الأوردر اللي عليه الماكينتين مستوفيتين بيطلع صفّين (واحد لكل ماكينة).
 // ⚠️ الفلترة على الميتافيلدات **بتتأكد في الكود** مش بالاستعلام بس: فلتر
 // ميتافيلد مش «filterable» بيتجاهله شوبيفاي في صمت ويرجّع المتجر كله.
@@ -170,7 +179,7 @@
 // ══════════════════════════════════════════════════════════════
 // §CONSTANTS
 // ══════════════════════════════════════════════════════════════
-const WORKER_VERSION   = '3.6.1';
+const WORKER_VERSION   = '3.7.0';
 const API_VERSION      = '2026-01';                          // صريح دايمًا — أبدًا "latest"
 const TOOL_NAME        = 'bosta_return';                     // login/logout D1 logging only — unchanged
 const SOURCE_TOOL      = 'bosta_orders_returned_scanner';    // used in extra.sourceTool for status-write logs
@@ -186,7 +195,10 @@ const BOSTA_API_BASE   = 'https://app.bosta.co/api/v2';
 const MAX_BATCH = 200;
 
 // ─── §CONSTANTS::readyReturn — طابور «راجع من بوسطة» ───
-const BOSTA_OUT_FOR_RETURN_CODE = 41;     // `41 · Out For Return` — كود حالة بوسطة في ميتافيلد الـ webhook
+// أكواد حالة بوسطة (ميتافيلد الـ webhook) اللي بتدخل الطابور:
+//   41 · Out For Return      — الشحنة في الطريق للمخزن
+//   46 · Returned to business — المندوب سلّمها (بتختفي من الطابور بعد السكان لما S1/S2 يبقى Returned)
+const BOSTA_RETURN_CODES = new Set([41, 46]);
 const READY_RETURN_PAGE   = 50;           // حجم الصفحة: ~١٢ ميتافيلد × ٥٠ أوردر تحت سقف تكلفة الاستعلام الواحد
 const READY_RETURN_MAX_PAGES = 12;        // حارس حلقة مش سقف بيانات — لو اتضرب بيرجع truncated:true
 
@@ -1544,7 +1556,8 @@ async function handleReadyReturn(request, env) {
       const emit = (machine, status, whRaw, whAt, tn, where) => {
         // ② In-Return على الماكينة دي  ③ كود الـ webhook = 41
         if (status !== (machine === 'S1' ? S1_STATUS.IN_RETURN : S2_STATUS.IN_RETURN)) return;
-        if (readyReturnCode(whRaw) !== BOSTA_OUT_FOR_RETURN_CODE) return;
+        const bostaCode = readyReturnCode(whRaw);
+        if (!BOSTA_RETURN_CODES.has(bostaCode)) return;
         rows.push({
           orderId:     o.legacyResourceId,
           orderName:   o.name,
@@ -1554,6 +1567,7 @@ async function handleReadyReturn(request, env) {
           tracking:    tn?.value || (machine === 'S1' ? o.tnOld?.value : null) || null,
           trackingLegacy: !tn?.value && machine === 'S1' && !!o.tnOld?.value,
           bostaStatus: String(whRaw).trim(),
+          bostaCode,                                 // 41 | 46 — الواجهة بتعرضه في عمود «حالة بوسطة»
           bostaStatusAt: whAt?.value || null,
           whereabouts: where?.value || null,
         });
