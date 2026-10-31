@@ -5,7 +5,7 @@
 //                       (extra.sourceTool = "bosta_orders_returned_scanner" — see §CONSTANTS)
 //
 // ═══════════════════════════════════════════════════════════════════════════
-// v3.7.1 — فلتر `transition` (عمود «التحديث» في تاب السجل) — بحث نصي في value_before/value_after
+// v3.7.1 — فلتر `transitions` (عمود «التحديث» في تاب السجل) — multi-select على value_before
 // v3.7.0 — §READY-RETURN: الشرط ③ بقى كود ∈ {41, 46} (طلب أحمد 31-10-2026)
 // ═══════════════════════════════════════════════════════════════════════════
 // الثغرة: الطرد اللي المندوب سلّمه للمخزن بوسطة بتحوّل كوده من `41 · Out For Return`
@@ -525,7 +525,7 @@ function buildLogFilterSQL(select, {
   employee = null, employees = null,
   type     = null, types     = null,
   results  = null, machines  = null,
-  search   = null, transition = null,
+  search   = null, transitions = null,
   dateFrom = null, dateTo    = null,
 } = {}) {
   let sql = `${select} FROM logs WHERE type NOT IN ('login','logout') AND ${LOG_SCOPE_SQL}`;
@@ -547,8 +547,10 @@ function buildLogFilterSQL(select, {
   }
 
   if (search)   { sql += ' AND (order_name LIKE ? OR notes LIKE ?)'; b.push(`%${search}%`, `%${search}%`); }
-  // v3.7.1 — فلتر عمود «التحديث» (value_before → value_after) — نص جزئي على أي من الطرفين
-  if (transition) { sql += ' AND (value_before LIKE ? OR value_after LIKE ?)'; b.push(`%${transition}%`, `%${transition}%`); }
+  // v3.7.1 — فلتر عمود «التحديث» (value_before → value_after) — multi-select على الحالة قبل التحديث
+  if (Array.isArray(transitions) && transitions.length) {
+    sql += ` AND value_before IN (${transitions.map(() => '?').join(',')})`; b.push(...transitions);
+  }
   if (dateFrom) { sql += ' AND substr(timestamp, 1, 10) >= ?'; b.push(dateFrom); }
   if (dateTo)   { sql += ' AND substr(timestamp, 1, 10) <= ?'; b.push(dateTo); }
 
@@ -616,7 +618,7 @@ async function getLogsExport(db, { sortBy, sortDir, ...filters } = {}) {
 function logParamsFrom(url) {
   const csv = (k) => (url.searchParams.get(k) || '').split(',').map(s => s.trim()).filter(Boolean);
   const employees = csv('employees'), types = csv('types');
-  const results   = csv('results'),   machines = csv('machines');
+  const results   = csv('results'),   machines = csv('machines'), transitions = csv('transitions');
   return {
     employees: employees.length ? employees : null,
     employee:  url.searchParams.get('employee') || null,
@@ -625,7 +627,7 @@ function logParamsFrom(url) {
     results:   results.length  ? results  : null,
     machines:  machines.length ? machines : null,
     search:    url.searchParams.get('search')   || null,
-    transition: url.searchParams.get('transition') || null,
+    transitions: transitions.length ? transitions : null,
     dateFrom:  url.searchParams.get('dateFrom') || null,
     dateTo:    url.searchParams.get('dateTo')   || null,
   };
