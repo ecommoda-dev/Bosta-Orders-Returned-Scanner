@@ -548,8 +548,15 @@ function buildLogFilterSQL(select, {
 
   if (search)   { sql += ' AND (order_name LIKE ? OR notes LIKE ?)'; b.push(`%${search}%`, `%${search}%`); }
   // v3.7.1 — فلتر عمود «التحديث» (value_before → value_after) — multi-select على الحالة قبل التحديث
+  // القيمة الخاصة `__rejected__` = صفوف «ما اتنفّذش» (type='rejected') — بتتعرض في العمود «الحالة · ما اتنفّذش»
+  // والباقي = حالة قبل التحديث للصفوف المتنفّذة بس (مرفوض بنفس value_before ما يدخلش هنا).
   if (Array.isArray(transitions) && transitions.length) {
-    sql += ` AND value_before IN (${transitions.map(() => '?').join(',')})`; b.push(...transitions);
+    const wantRej = transitions.includes('__rejected__');
+    const vals = transitions.filter(v => v !== '__rejected__');
+    const parts = [];
+    if (vals.length) { parts.push(`(type != 'rejected' AND value_before IN (${vals.map(() => '?').join(',')}))`); b.push(...vals); }
+    if (wantRej)     { parts.push(`type = 'rejected'`); }
+    sql += ` AND (${parts.join(' OR ')})`;
   }
   if (dateFrom) { sql += ' AND substr(timestamp, 1, 10) >= ?'; b.push(dateFrom); }
   if (dateTo)   { sql += ' AND substr(timestamp, 1, 10) <= ?'; b.push(dateTo); }
