@@ -913,6 +913,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
               <th>رقم التتبع</th>
               <th>العميل</th>
               <th>نوع الأوردر</th>
+              <th>حالة بوسطة</th>
               <th>آخر تحديث من بوسطة</th>
               <th>النتيجة</th>
               <th>إجراء</th>
@@ -3515,6 +3516,18 @@ let rqLoadP = null;
 
 
 // ⚠️ العدّاد قبل أول جلب ناجح = `—` مش `0` — «ما اتحدّثش» ≠ «مفيش شغل».
+// 🔴 عمود «حالة بوسطة» — بيفرّق «في الطريق للمخزن» (41) عن «رجعت للتاجر» (46). عرض بحت: الحكم في الـ Worker.
+//    الكود من `bostaCode` (Worker ≥ 3.7.0) وإلا من أول رقم في النص الخام — النص الخام بيتعرض تحت البادج دايمًا.
+function rqBostaCell(o) {
+  const raw  = String(o.bostaStatus || '').trim();
+  const m    = raw.match(/^(\d{1,3})\b/);
+  const code = o.bostaCode != null ? Number(o.bostaCode) : (m ? parseInt(m[1], 10) : null);
+  const badge = code === 46 ? '<span class="badge badge-success">🏠 رجعت للتاجر</span>'
+              : code === 41 ? '<span class="badge badge-blue">🚚 في الطريق للمخزن</span>'
+              :               '<span class="badge badge-neutral">حالة أخرى</span>';
+  return `${badge}${raw ? `<span class="rq-time" dir="ltr">${esc(raw)}</span>` : ''}`;
+}
+
 function rqResultCell(o) {
   if (o.conflict) return `<span class="badge badge-danger">⛔ تعارض — مرفوضة</span><br><span class="reject-reason">${esc(o.conflict)}</span>`;
   if (o.sel)      return `<span class="badge badge-success">✅ جاهزة للتحديث</span>`;
@@ -3574,6 +3587,7 @@ function rqRender() {
       <td><span class="tracking-num rq-trk">${esc(o.tracking || '—')}</span>${o.trackingLegacy ? ' <span class="badge badge-neutral" title="الرقم جاي من الحقل القديم bosta_tracking_number">قديم</span>' : ''}</td>
       <td class="rq-cust">${esc(o.customer || '—')}</td>
       <td>${machine}</td>
+      <td>${rqBostaCell(o)}</td>
       <td>${o.bostaStatusAt ? `${esc(formatDate(o.bostaStatusAt))}<span class="rq-time">${esc(formatTimeOnly(o.bostaStatusAt))}</span>` : '—'}</td>
       <td>${rqResultCell(o)}</td>
       <td>${rqActionCell(o, i)}</td>
