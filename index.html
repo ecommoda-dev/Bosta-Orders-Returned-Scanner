@@ -280,6 +280,8 @@ tbody td.col-check { text-align: center; }
 .order-link   { font-weight: 700; font-size: 14px; color: var(--accent); font-family: var(--font-mono); text-decoration: none; }
 .order-link:hover { text-decoration: underline; }
 .tracking-num { font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary); }
+.trk-link { color: var(--accent); font-family: var(--font-mono); font-weight: 700; text-decoration: none; }
+.trk-link:hover { text-decoration: underline; }
 input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
 
 /* ── Rejected rows (transition not allowed) ── */
@@ -3316,6 +3318,14 @@ function normalizeLogRow(e) {
   };
 }
 
+// ─── §TRK-LINK — رقم التتبع لينك لداشبورد بوسطة (طلب أحمد 31-10-2026) ───
+// ⚠️ نفس الدالة في index.html بتاع ريبو Bosta-Orders-Returned-Scanner وفي الهب (درس R1).
+function bostaTrackLink(tn) {
+  const t = String(tn == null ? '' : tn).trim();
+  if (!t || t === '—') return esc(t || '—');
+  return `<a class="trk-link" href="https://business.bosta.co/orders/${encodeURIComponent(t)}" target="_blank" rel="noopener noreferrer">${esc(t)}</a>`;
+}
+
 // ─── §LOG-JS::employeeDisplayName ───
 function employeeDisplayName(username) {
   if (!username) return '';
@@ -3390,7 +3400,7 @@ function renderLogTable() {
         <td>${machineBadge}</td>
         <td>${transition}</td>
         <td>${resultCell}</td>
-        <td class="log-ts">${esc(row.tn || '—')}</td>
+        <td class="log-ts">${bostaTrackLink(row.tn)}</td>
       </tr>`;
   }).join('');
 }
@@ -3584,7 +3594,7 @@ function rqRender() {
     const cls = o.conflict ? 'row-rejected' : (o.sel ? 'rq-ready' : '');
     return `<tr id="rqRow-${i}" class="${cls}">
       <td>${orderLink(esc(o.orderName), o.orderId)}</td>
-      <td><span class="tracking-num rq-trk">${esc(o.tracking || '—')}</span>${o.trackingLegacy ? ' <span class="badge badge-neutral" title="الرقم جاي من الحقل القديم bosta_tracking_number">قديم</span>' : ''}</td>
+      <td><span class="tracking-num rq-trk">${bostaTrackLink(o.tracking)}</span>${o.trackingLegacy ? ' <span class="badge badge-neutral" title="الرقم جاي من الحقل القديم bosta_tracking_number">قديم</span>' : ''}</td>
       <td class="rq-cust">${esc(o.customer || '—')}</td>
       <td>${machine}</td>
       <td>${rqBostaCell(o)}</td>
