@@ -3121,7 +3121,8 @@ const srvLog = ecoSrvFilters({
     { key: 'search',  th: '#thOrder',   type: 'text', label: 'بحث برقم أوردر أو ملاحظة', param: 'search' },
     { key: 'trans',   th: '#thTrans',   type: 'list', label: 'التحديث', param: 'transitions', items: [
         { value: 'In-Return', label: 'In-Return → Returned' },
-        { value: 'Shipped',   label: 'Shipped → Returned' } ] },
+        { value: 'Shipped',   label: 'Shipped → Returned' },
+        { value: '__rejected__', label: '— · ما اتنفّذش' } ] },
     { key: 'machine', th: '#thMachine', type: 'list', label: 'الماكينة', param: 'machines', items: [
         { value: 'S1', label: 'S1 — مسار RTO' },
         { value: 'S2', label: '[S-2] — مرتجع بعد التسليم' } ] },
